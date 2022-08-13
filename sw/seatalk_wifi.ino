@@ -14,22 +14,29 @@ sensor_data_t sensor_data;
 #define WIFI_SSID                   ""
 #define WIFI_PASS                   ""
 
-#define COLORIZE_PRETTYPRINT
-
 char cmd_payload[16];   // Holds the payload of the SeaTalk sentence.
 char nmea_message[96];  // Maximum NMEA sentence length is 82 bytes.
 const char *nmea_talker = "LR";
 int current_state = SM_STATE_SEEK_CMD;
 
-// Number of the entry in the command array for the sentence just
-//  received.
-unsigned int current_command = 0;
-unsigned int payload_bytes_received = 0;
-unsigned int cursor_position;
-float apparent_wind_angle = 0., apparent_wind_speed;
-
 // Text buffer for the serial and/or telnet loggers.
 char str_logger[256];
+
+unsigned long ms_timer;
+
+const int baudrates[] = 
+{
+    // These values must match those in the SELECT tag in the
+    //  HTML code.
+    9600, 19200, 38400, 57600, 115200
+};
+
+// Number of the entry in the command array for the sentence just
+//  received.
+unsigned int table_item;
+unsigned int packet_bytes_received = 0;
+unsigned int cursor_position;
+float apparent_wind_angle = 0., apparent_wind_speed;
 
 ESP8266WebServer http_server(80);
 
@@ -80,10 +87,10 @@ static void nmea_server_disconnect(String ip)
 
 static struct __cmd seatalk_commands[] =
 {
-    {SEATALK_APPARENT_WIND_ANGLE, 3, "APPARENT_WIND_ANGLE"},
-    {SEATALK_APPARENT_WIND_SPEED, 3, "APPARENT_WIND_SPEED"},
-    {SEATALK_LAMP_INTENSITY, 2,      "LAMP_INTENSITY"},
-    // The following must always be the last entry on this table.
+    {SEATALK_APPARENT_WIND_ANGLE, 4, "APPARENT_WIND_ANGLE"},
+    {SEATALK_APPARENT_WIND_SPEED, 4, "APPARENT_WIND_SPEED"},
+    {SEATALK_LAMP_INTENSITY,      3, "LAMP_INTENSITY"},
+    // Add new entries to this table above this line.
     {SEATALK_UNSUPPORTED,         0, "UNSUPPORTED"}, 
 };
 
@@ -156,22 +163,24 @@ int nmea_compute_checksum(char *buf)
     return chksum;
 }
 
-void text_attribute(char *p, text_attribute_t c)
+void append_text_attribute(char *p, text_attribute_t c)
 {
-#if defined(COLORIZE_PRETTYPRINT)
-    strcat(p, "\e[");
-    sprintf(p + strlen(p), "%dm", c);
-#endif
+    if (sensor_data.status.colorize_prettyprint == 1)
+    {
+        strcat(p, "\e[");
+        sprintf(p + strlen(p), "%dm", c);
+    }
 }
 
 void print_attribute(text_attribute_t c)
 {
-#if defined(COLORIZE_PRETTYPRINT)
-    char p[8];
-    p[0] = '\0';
-    text_attribute(p, c);
-    Serial1.print(p);
-#endif
+    if (sensor_data.status.colorize_prettyprint == 1)
+    {
+        char p[8];
+        p[0] = '\0';
+        append_text_attribute(p, c);
+        Serial1.print(p);
+    }
 }
 
 // From Hacker's Delight.
@@ -199,12 +208,21 @@ bool parity_bit(int c)
 
 static void prettyprint_command(char *p, unsigned int cursor_position)
 {
+    p[0] = '\0';
+    append_text_attribute(p, TEXT_ATTRIB_FG_BLUE);
+    cursor_position = sprintf(p + strlen(p), "%02X ", cmd_payload[0]);
+    append_text_attribute(p, TEXT_ATTRIB_NORMAL);
+
+    for (int i = 1; i < packet_bytes_received; i++)
+        cursor_position += sprintf(p + strlen(p),
+                                   "%02X ",
+                                   cmd_payload[i]);
     append_blanks(p, SEATALK_CMD_COLUMN, cursor_position);
-    text_attribute(p, TEXT_ATTRIB_FG_GREEN);
-    strcat(p, seatalk_commands[current_command].cmd_name);
-    text_attribute(p, TEXT_ATTRIB_NORMAL);
+    append_text_attribute(p, TEXT_ATTRIB_FG_GREEN);
+    strcat(p, seatalk_commands[table_item].cmd_name);
+    append_text_attribute(p, TEXT_ATTRIB_NORMAL);
     cursor_position = SEATALK_CMD_COLUMN +
-          strlen(seatalk_commands[current_command].cmd_name);
+          strlen(seatalk_commands[table_item].cmd_name);
     append_blanks(p, SEATALK_ARG_COLUMN, cursor_position);
 }
 
@@ -218,9 +236,9 @@ static void print_slogger_banner(void)
     cursor_position = SEATALK_CMD_COLUMN + strlen("Command");
     while (cursor_position++ < SEATALK_ARG_COLUMN)
         Serial1.print(" ");
-    Serial1.println("Arguments\r\n"
-                     "------------------------------------"
-                     "------------------------------------");
+    Serial1.print("Arguments\r\n"
+                   "------------------------------------"
+                   "------------------------------------\r\n");
 }
 
 void handleRoot()
@@ -240,8 +258,15 @@ void handler_updater(void)
     sensor_data.status.telnet_logger = value.toInt();
     value = http_server.arg("slogger_baud");
     sensor_data.status.slogger_baudrate = value.toInt();
-    value = http_server.arg("server_port");
-    sensor_data.server_port = value.toInt();
+    if (http_server.arg("server_port").toInt() < 65536)
+        sensor_data.server_port =
+                        http_server.arg("server_port").toInt();
+    sensor_data.hostname[0] = '\0';
+    strncat((char *)sensor_data.hostname,
+            http_server.arg("hostname").c_str(),
+            31);        
+    value = http_server.arg("colorize");
+    sensor_data.status.colorize_prettyprint = value.toInt();
     http_server.send(200, "text/plain", "\r\n");
     commit_eeprom();
 }
@@ -251,12 +276,15 @@ void handler_get_status(void)
     char s[128];
     sprintf(s,
             "ipaddr=%s&slogger=%d&tlogger=%d&"
-            "slogger_baudrate=%d&server_port=%d",
+            "slogger_baudrate=%d&server_port=%d&"
+            "hostname=%s&colorize=%d",
             WiFi.localIP().toString().c_str(),
             sensor_data.status.serial_logger,
             sensor_data.status.telnet_logger,
             sensor_data.status.slogger_baudrate,
-            sensor_data.server_port);
+            sensor_data.server_port,
+            sensor_data.hostname,
+            sensor_data.status.colorize_prettyprint);
     http_server.send(200, "text/plain", s);
 }
 
@@ -265,22 +293,59 @@ void handler_page_not_found(void)
     http_server.send(404, "text/plain", "404: Not found");
 }
 
-void print_framing_error(unsigned int payload_byte)
+void sendout_strlogger(void)
+{
+    strcat(str_logger, "\r\n");
+    if (sensor_data.status.serial_logger == 1)
+        Serial1.print(str_logger);
+
+    if (sensor_data.status.telnet_logger == 1)
+        if (telnet_logger_connected == true)
+            telnet_logger.print(str_logger);
+}
+
+void print_framing_error(unsigned int payload_byte,
+                         unsigned int expected)
 {
     // Packet is compromised.
     cursor_position += sprintf(str_logger + strlen(str_logger),
                                "%02X ",
                                payload_byte);
     append_blanks(str_logger, SEATALK_CMD_COLUMN, cursor_position);
-    text_attribute(str_logger, TEXT_ATTRIB_FG_RED);
+    append_text_attribute(str_logger, TEXT_ATTRIB_FG_RED);
     sprintf(str_logger + strlen(str_logger), "FRAMING ERROR\r\n");
-    text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
-    if (sensor_data.status.serial_logger == 1)
-        Serial1.println(str_logger);
+    append_text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
+    append_blanks(str_logger, SEATALK_ARG_COLUMN, cursor_position);
+    sprintf(str_logger + strlen(str_logger), "Expected 0x%02X", expected);
+    sendout_strlogger();
+}
 
-    if (sensor_data.status.telnet_logger == 1)
-        if (telnet_logger_connected == true)
-            telnet_logger.println(str_logger);
+void print_parity_error(unsigned int payload_byte)
+{
+    // Packet is compromised.
+    str_logger[0] = '\0';
+    append_text_attribute(str_logger, TEXT_ATTRIB_FG_BLUE);
+    if (packet_bytes_received == 1)
+        append_text_attribute(str_logger, TEXT_ATTRIB_FG_RED);
+    cursor_position = sprintf(str_logger + strlen(str_logger),
+                              "%02X ",
+                              cmd_payload[0]);
+    append_text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
+
+    for (int i = 1; i < packet_bytes_received; i++)
+    {
+        if (i == packet_bytes_received - 1)
+            append_text_attribute(str_logger, TEXT_ATTRIB_FG_RED);
+        cursor_position += sprintf(str_logger + strlen(str_logger),
+                                   "%02X ",
+                                   cmd_payload[i]);
+        append_text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
+    }
+    append_blanks(str_logger, SEATALK_CMD_COLUMN, cursor_position);
+    append_text_attribute(str_logger, TEXT_ATTRIB_FG_RED);
+    sprintf(str_logger + strlen(str_logger), "PARITY ERROR");
+    append_text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
+    sendout_strlogger();
 }
 
 void setup()
@@ -303,6 +368,8 @@ void setup()
         sensor_data.status.telnet_logger = 0;
         sensor_data.status.slogger_baudrate = 4;
         sensor_data.server_port = NMEA_SERVER_DEFAULT_PORT;
+        sensor_data.hostname[0] = '\0';
+        strncat((char *)sensor_data.hostname, DEFAULT_HOSTNAME, 31);        
         sensor_data.magic_number = MAGIC_NUMBER;
         commit_eeprom();
     }
@@ -310,15 +377,15 @@ void setup()
     // This is the serial used for logging messages.
     Serial1.begin(baudrates[sensor_data.status.slogger_baudrate]);
     while (!Serial1);
-    
+
+    Serial1.print("\e[2J\r\n");    
     dump_eeprom();
     print_eeprom();
 
     int seconds = 0;
 
-    //Set new hostname
     WiFi.mode(WIFI_STA);
-    WiFi.hostname(DEFAULT_HOSTNAME);
+    WiFi.hostname((char *)sensor_data.hostname);
     WiFi.begin(WIFI_SSID, WIFI_PASS);
     while (WiFi.status() != WL_CONNECTED)
     {
@@ -386,6 +453,9 @@ void setup()
 
     if (sensor_data.status.serial_logger == 1)
         print_slogger_banner();
+
+    pinMode(16, OUTPUT);
+    digitalWrite(16, HIGH);
 }
 
 void loop()
@@ -395,6 +465,9 @@ void loop()
     unsigned int seatalk_cmd;
     WiFiClient cl;
 
+    if (millis() > ms_timer)
+        digitalWrite(16, HIGH);
+        
     nmea_server.loop();
     if (sensor_data.status.telnet_logger == 1)
         telnet_logger.loop();
@@ -409,85 +482,89 @@ void loop()
         parity = parity_bit(seatalk_cmd);
         if (parity == 1)
         {
-            str_logger[0] = '\0';
-            text_attribute(str_logger, TEXT_ATTRIB_FG_RED);
-            cursor_position = sprintf(str_logger + strlen(str_logger),
-                                      "%02X ",
-                                      seatalk_cmd);
-            text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
-            current_command = 0;
+            // Make sure that the command received is one of those
+            //  currently supported, which are held in the
+            //  seatalk_commands[] array.
+            table_item = 0;
             do
             {
-                if (seatalk_commands[current_command].cmd == 
-                                                          seatalk_cmd)
+                if (seatalk_commands[table_item].cmd == seatalk_cmd)
+                {
+                    cmd_payload[0] = seatalk_cmd;
+                    packet_bytes_received = 1;
+                    current_state = SM_STATE_PAYLOAD;
                     break;
-                current_command += 1;
+                }
+                table_item += 1;
             }
-            while (seatalk_commands[current_command].cmd != 
-                                                    SEATALK_UNSUPPORTED);
-            if (seatalk_commands[current_command].cmd ==
-                                                    SEATALK_UNSUPPORTED)
-            {
+            while (seatalk_commands[table_item].cmd != 
+                                                SEATALK_UNSUPPORTED);
+            if (seatalk_commands[table_item].cmd == SEATALK_UNSUPPORTED)
                 current_state = SM_STATE_PRETTYPRINT;
-            }
-            else
-            {
-                payload_bytes_received = 0;
-                current_state = SM_STATE_PAYLOAD;
-            }
         }
         break;
     case SM_STATE_PAYLOAD:
         if (Serial.available() == 0)
-            return;
+            break;
         payload_byte = Serial.read();
-        cursor_position += sprintf(str_logger + strlen(str_logger),
-                                   "%02X ",
-                                   payload_byte);
+        parity = parity_bit(payload_byte);
+        if (parity == 1)
+        {
+            // Payload bytes are never supposed to have the parity
+            //  bit set. We'll toss the entire frame.
+            print_parity_error(payload_byte);
+            current_state = SM_STATE_SEEK_CMD;
+        }
+        else
+        {
+            cmd_payload[packet_bytes_received] = payload_byte;
+            packet_bytes_received += 1;
+            if (packet_bytes_received == 
+                                seatalk_commands[table_item].bytes)
+                current_state = SM_STATE_SANITY_CHECK;
+        }
+        break;
+    case SM_STATE_SANITY_CHECK:
         // Perform due diligence on the data received.
-        switch (seatalk_commands[current_command].cmd)
+        switch (seatalk_commands[table_item].cmd)
         {
         case SEATALK_APPARENT_WIND_ANGLE:
         case SEATALK_APPARENT_WIND_SPEED:
             // First payload byte must be 0x01.
-            if ((payload_bytes_received == 0) && (payload_byte != 0x01))
+            if (cmd_payload[1] != 0x01)
             {
-                print_framing_error(payload_byte);
+                print_framing_error(cmd_payload[1], 0x01);
                 current_state = SM_STATE_SEEK_CMD;
             }
+            else
+                current_state = SM_STATE_FORMAT;
             break;
         case SEATALK_LAMP_INTENSITY:
-            if ((payload_bytes_received == 0) && (payload_byte != 0))
+            if (cmd_payload[1] != 0x00)
             {
-                print_framing_error(payload_byte);
+                print_framing_error(cmd_payload[1], 0x00);
                 current_state = SM_STATE_SEEK_CMD;
             }
+            else
+                current_state = SM_STATE_FORMAT;
             break;
         default:
+            current_state = SM_STATE_FORMAT;
             break;
-        }
-
-        if (current_state == SM_STATE_PAYLOAD)
-        {
-            cmd_payload[payload_bytes_received] = payload_byte;
-            payload_bytes_received += 1;
-            if (payload_bytes_received == 
-                                seatalk_commands[current_command].bytes)
-                current_state = SM_STATE_FORMAT;
         }
         break;
     case SM_STATE_FORMAT:
-        switch (seatalk_commands[current_command].cmd)
+        switch (seatalk_commands[table_item].cmd)
         {
         case SEATALK_APPARENT_WIND_ANGLE:
-            apparent_wind_angle = 0.5 * ((cmd_payload[1] * 100 +
-                                                cmd_payload[2]) % 360);
+            apparent_wind_angle = 0.5 * (((cmd_payload[2] << 8) +
+                                                cmd_payload[3]) % 360);
             current_state = SM_STATE_SEND;
             break;
         case SEATALK_APPARENT_WIND_SPEED:
-            apparent_wind_speed = 1.0 * (cmd_payload[1] & 0x7F) +
-                                 (1.0 * (cmd_payload[2] & 0x0F)) / 10.;
-            if ((cmd_payload[1] & 0x80) != 0)
+            apparent_wind_speed = 1.0 * (cmd_payload[2] & 0x7F) +
+                                 (1.0 * (cmd_payload[3] & 0x0F)) / 10.;
+            if ((cmd_payload[2] & 0x80) != 0)
                 // Value for speed is in m/s. We'll convert to knots.
                 apparent_wind_speed *= 1.944;
             current_state = SM_STATE_SEND;
@@ -501,7 +578,7 @@ void loop()
         }
         break;
     case SM_STATE_SEND:
-        switch (seatalk_commands[current_command].cmd)
+        switch (seatalk_commands[table_item].cmd)
         {
         case SEATALK_APPARENT_WIND_SPEED:
         case SEATALK_APPARENT_WIND_ANGLE:
@@ -528,45 +605,48 @@ void loop()
         if ((sensor_data.status.serial_logger == 1) ||
                 (sensor_data.status.telnet_logger == 1))
         {        
-            switch (seatalk_commands[current_command].cmd)
+            switch (seatalk_commands[table_item].cmd)
             {
             case SEATALK_APPARENT_WIND_ANGLE:
                 prettyprint_command(str_logger, cursor_position);
-                text_attribute(str_logger, TEXT_ATTRIB_FG_BLUE);
+                append_text_attribute(str_logger, TEXT_ATTRIB_FG_BLUE);
                 float_to_str(str_logger, apparent_wind_angle, 1);
                 strcat(str_logger, " deg");
-                text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
+                append_text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
                 break;
             case SEATALK_APPARENT_WIND_SPEED:
                 prettyprint_command(str_logger, cursor_position);
-                text_attribute(str_logger, TEXT_ATTRIB_FG_BLUE);
+                append_text_attribute(str_logger, TEXT_ATTRIB_FG_BLUE);
                 float_to_str(str_logger, apparent_wind_speed, 1);
                 strcat(str_logger, " knots");
-                text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
+                append_text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
                 break;
             case SEATALK_LAMP_INTENSITY:
                 prettyprint_command(str_logger, cursor_position);
-                text_attribute(str_logger, TEXT_ATTRIB_FG_BLUE);
+                append_text_attribute(str_logger, TEXT_ATTRIB_FG_BLUE);
                 sprintf(str_logger + strlen(str_logger),
                         "%d",
-                        (cmd_payload[1] & 0x0C) >> 2);
-                text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
+                        (cmd_payload[2] & 0x0C) >> 2);
+                append_text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
                 break;
             default:
+                // Unsupported SeaTalk sentence.
+                str_logger[0] = '\0';
+                append_text_attribute(str_logger, TEXT_ATTRIB_FG_RED);
+                cursor_position = sprintf(str_logger + strlen(str_logger),
+                                          "%02X ",
+                                          cmd_payload[0]);
                 append_blanks(str_logger, SEATALK_CMD_COLUMN, cursor_position);
-                text_attribute(str_logger, TEXT_ATTRIB_FG_RED);
-                strcat(str_logger, seatalk_commands[current_command].cmd_name);
-                text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
+                strcat(str_logger, seatalk_commands[table_item].cmd_name);
+                append_text_attribute(str_logger, TEXT_ATTRIB_NORMAL);
                 break;
             }
         }
 
-        if (sensor_data.status.serial_logger == 1)
-            Serial1.println(str_logger);
-        if (sensor_data.status.telnet_logger == 1)
-            if (telnet_logger_connected == true)
-                telnet_logger.println(str_logger);
+        sendout_strlogger();
         current_state = SM_STATE_SEEK_CMD;
+        digitalWrite(16, LOW);
+        ms_timer = millis() + 100;
         break;    
     default:
         break;

@@ -20,6 +20,9 @@ const char homepage[] = R"=====(
     document.getElementsByName("slogger_baudrate")[0].selectedIndex = parseInt(baud, 10);
     const port = urlParams.get('server_port');
     document.getElementsByName("server_port")[0].valueAsNumber = parseInt(port, 10);
+    document.getElementsByName("hostname")[0].value = urlParams.get('hostname');
+    const colorize = urlParams.get('colorize');
+    document.getElementsByName("colorize")[0].checked = (parseInt(colorize, 10) == 1);
   }
   function update_values()
   {
@@ -30,6 +33,9 @@ const char homepage[] = R"=====(
     url += "&slogger_baud="
     url += document.getElementsByName("slogger_baudrate")[0].selectedIndex
     url += "&server_port=" + document.getElementsByName("server_port")[0].value
+    url += "&hostname=" + document.getElementsByName("hostname")[0].value
+    url += "&colorize=";
+    url += (document.getElementsByName("colorize")[0].checked == true) ? 1 : 0
     const xhttp=new XMLHttpRequest();
     xhttp.onload = function() {post_update(this);}
     xhttp.open("GET", url);
@@ -43,7 +49,7 @@ const char homepage[] = R"=====(
 <fieldset>
 <legend>Raymarine Seatalk Instrument Settings</legend>
 <table>
-<tr><th>Type</th><th>EEPROM Value</th></tr>
+<tr><th>Type</th><th>Value</th></tr>
 <tr><td>Local IP Address</td><td><label name="ipaddr">0.0.0.0</label></td></tr>
 <tr><td>Serial Logger</td><td><input type="checkbox" name="slogger" onclick="update_values()"></td></tr>
 <tr>
@@ -57,8 +63,12 @@ const char homepage[] = R"=====(
 </td></tr>
 <tr>
 <td>Telnet Logger</td><td><input type="checkbox" name="tlogger" onclick="update_values()"></td></tr>
+<tr><td>Hostname</td><td><input type="text" name="hostname" required
+       minlength="3" maxlength="31" size="10"></td>
+       <td><button type="button" onclick="update_values()">Update</button></td></tr>
 <td>NMEA Port</td><td><input type="number" name="server_port" ></input></td>
 <td><button type="button" onclick="update_values()">Update</button></td></tr>
+<tr><td>Colorize Prettyprint</td><td><input type="checkbox" name="colorize" onclick="update_values()"></td></tr>
 </table>
 </fieldset>
 <fieldset>

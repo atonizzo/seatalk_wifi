@@ -1,5 +1,8 @@
+#include "seatalk_wifi.h"
+
 void dump_eeprom(void)
 {
+    Serial1.print("\r\n");
     // Round up the length to the next 4 words.
     Serial1.println("         0  1  2  3  4  5  6  7  8  9"
                    "  A  B  C  D  E  F");
@@ -37,18 +40,45 @@ void print_eeprom(void)
     Serial1.println("-----------------------------------------");
     Serial1.print("Serial Logger: ");
     if (sensor_data.status.serial_logger == 0)
+    {
+        print_attribute(TEXT_ATTRIB_FG_RED);
         Serial1.println("Disabled");
+    }
     else    
+    {
+        print_attribute(TEXT_ATTRIB_FG_GREEN);
         Serial1.println("Enabled");
+    }
+    print_attribute(TEXT_ATTRIB_NORMAL);
     Serial1.print("Telnet Logger: ");
     if (sensor_data.status.telnet_logger == 0)
+    {
+        print_attribute(TEXT_ATTRIB_FG_RED);
         Serial1.println("Disabled");
+    }
     else    
+    {
+        print_attribute(TEXT_ATTRIB_FG_GREEN);
         Serial1.println("Enabled");
+    }
+    print_attribute(TEXT_ATTRIB_NORMAL);
     Serial1.print("Serial Logger Baud Rate: ");
     Serial1.println(baudrates[sensor_data.status.slogger_baudrate]);
+    Serial1.print("Hostname: ");
+    Serial1.println((char *)sensor_data.hostname);
     Serial1.print("Server Port: ");
     Serial1.println(sensor_data.server_port);
+    Serial1.print("Colorize Prettyprint: ");
+    if (sensor_data.status.colorize_prettyprint == 0)
+    {
+        Serial1.println("Disabled");
+    }
+    else    
+    {
+        print_attribute(TEXT_ATTRIB_FG_GREEN);
+        Serial1.println("Enabled");
+        print_attribute(TEXT_ATTRIB_NORMAL);
+    }
     Serial1.print("\r\n");
 }
 
@@ -59,4 +89,11 @@ void commit_eeprom(void)
         EEPROM.put(i, p[i]);
     EEPROM.commit();
     print_eeprom();
+}
+
+void erase_eeprom(void)
+{
+    for (int i = 0; i < EEPROM_SIZE; i++)
+        EEPROM.put(i, 0);
+    EEPROM.commit();
 }

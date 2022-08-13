@@ -3,11 +3,34 @@
 
 typedef enum
 {
+    // The SM_STATE_SEEK_CMD looks for a byte from
+    //  the input data stream that comes with the
+    //  parity bit set.
     SM_STATE_SEEK_CMD           = 0,
+
+    // The SM_STATE_PAYLOAD collects the payload
+    //  bytes for the specific command just received
+    //  during the SM_STATE_SEEK_CMD state. The number
+    //  of bytes to receive is held in the
+    //  seatalk_commands[] structure.
     SM_STATE_PAYLOAD            = 1,
-    SM_STATE_FORMAT             = 2,
-    SM_STATE_SEND               = 3,
-    SM_STATE_PRETTYPRINT        = 4,
+
+    // The SM_STATE_SANITY_CHECK is meant to check if
+    //  the stream of payload bytes that was received
+    //  is correct.
+    SM_STATE_SANITY_CHECK       = 2,
+    
+    // The SM_STATE_FORMAT state extract any relevant
+    //  information from the payload bytes.
+    SM_STATE_FORMAT             = 3,
+
+    // The SM_STATE_SEND state creates the NMEA sentence
+    //  and sends it out via the nmea_server.
+    SM_STATE_SEND               = 4,
+
+    // The SM_STATE_PRETTYPRINT state prints out a message
+    //  to log the SeaTalk sentence that was just processed.
+    SM_STATE_PRETTYPRINT        = 5,
 } sm_state_t;
 
 typedef enum
@@ -47,27 +70,21 @@ typedef enum
     TEXT_ATTRIB_BG_WHITE   = 47
 } text_attribute_t;
 
-#define SEATALK_CMD_COLUMN      20
-#define SEATALK_ARG_COLUMN      48
+#define SEATALK_CMD_COLUMN          20
+#define SEATALK_ARG_COLUMN          48
 
-#define SEATALK_DATARATE        4800
-#define LOGPORT_DATARATE        115200
+#define SEATALK_DATARATE            4800
+#define LOGPORT_DATARATE            115200
 
 #define NMEA_SERVER_DEFAULT_PORT    3030
 
-const int baudrates[] = 
-{
-    // These values must match those in the SELECT tag in the
-    //  HTML code.
-    9600, 19200, 38400, 57600, 115200
-};
-
 struct __status
 {
-    volatile uint32_t serial_logger    : 1;
-    volatile uint32_t telnet_logger    : 1;
-    volatile uint32_t slogger_baudrate : 3;
-             uint32_t                  : 27;
+    volatile uint32_t serial_logger        : 1;
+    volatile uint32_t telnet_logger        : 1;
+    volatile uint32_t slogger_baudrate     : 3;
+    volatile uint32_t colorize_prettyprint : 1;
+             uint32_t                      : 26;
 };
 typedef struct __status status_t;
 
@@ -75,7 +92,8 @@ struct __sensor_data
 {
     volatile status_t status;
     volatile uint32_t server_port;
-    volatile uint8_t reserved[52];
+    volatile uint8_t hostname[32];
+    volatile uint8_t reserved[20];
     volatile uint32_t magic_number;
 };
 typedef struct __sensor_data sensor_data_t;
@@ -83,5 +101,8 @@ typedef struct __sensor_data sensor_data_t;
 #define MAGIC_NUMBER                0xABBACAFE
 
 #define DEFAULT_HOSTNAME            "wind"
+
+extern const int baudrates[];
+void print_attribute(text_attribute_t);
 
 #endif
