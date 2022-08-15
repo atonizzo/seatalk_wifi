@@ -15,9 +15,17 @@ electrical panel.
 The circuit is not fused and it is expected that a 1A fused be provided by
 the installer.
 
-###Schematic
-![Seatalk_wifi Schematic](hw/pictures/seatalk_wifi.svg)
+### Schematic
+![Seatalk_wifi Schematic](pictures/seatalk_wifi.svg)
 
+During the development of the board I noticed that the Raymarine instrument I
+was connected to (an ST40 wind instrument) was very finnicky about loading of
+the SeaTalk serial line. To isolate the Raymarine instrument from the rest of
+the circuitry Q2 acts as a buffer.
+
+U1 implemnts a switching regulator rated at least to 2A. An original version
+of this board designed with a linear regulator showed that the regulator
+tended to overheat, which prompted a redesign with a switching one.
 
 ### PCB Layout
 
@@ -27,14 +35,16 @@ in the fab/ directory.
 Board dimensions are 31 mm x 22 mm.
 
 #### Front Side
-![PCB Front Side](hw/pictures/seatalk_wifi_front.png)
+![PCB Front Side](pictures/seatalk_wifi_front.png)
 
 On the right side of the board the pads, from top to bottom, are:
 
 - GND
 - 12V (unfused, use a 1A fuse)
 
-These pads are conneced to a fused 12V line from the battery.
+These pads are connected to the boat battery via a fused connection. A better
+installation would require powering this board from the same switched
+connection that powers the navigation station.
 
 On the left side of the board the pads are meant to be connected to a Raymarine
 SeaTalk instrument and are, from top to bottom:
@@ -48,7 +58,7 @@ On the top side of the board the pads, from left to right, are:
 - Serial Logger (unmarked on the PCB) This pin is connected to the TX pin
 of serial port 2 of the ESP 12 and emits serial data that is mainly
 used for debugging of software. If enabled by the user it can also output a
-pretty print of each SeaTalk handled.
+pretty print of each SeaTalk sentence as they are handled by the software
 
 - Programming cable RX line (marked with R in the layout). This is connected
 to the RX pin of serial port 1 of the ESP12 and is primarily used to program
@@ -57,10 +67,10 @@ well as to receive the SeaTalk sentences from the instrument. This means that
 this pin must be disconnected from the programmer before resetting the board
 to to prevent interference between the programmer hardware and the SeaTalk
 instrument. Failure to disconnect this cable during regular use will prevent
-the SeaTalk sentences from being received by the MCU.
+the SeaTalk sentences from being received by the MCU
 
 - Programming cable TX line (marked with T in the layout) is connected to the
-TX pin of the ESP12.
+TX pin of the ESP12 and is only used during programming
 
 Since the board is run at 3.3V the typical programming is performed with a
 USB to serial converter connected to pads R, T and GND. If no further software
@@ -68,18 +78,18 @@ development is expected the programming cable should be disconnected from the
 board and the pads left unconnected.
 
 #### Back Side
-![PCB Back Side](hw/pictures/seatalk_wifi_back.png)
+![PCB Back Side](pictures/seatalk_wifi_back.png)
 
 The two switches on the left side are only used to program the board and are
-typically removed before they board is installed on the boat.
+typically removed before the board is installed on the boat.
 
-In order to program the board the RTS switch (the top one in the picture)
+In order to program the board the RST switch (the top one in the picture)
 should be pulsed **while the BOOT switch is kept pressed**. At this point
 the board is ready for the programmer to write the new software.
 
 ## Software
-The software must be compiled with the Arduino GUI. The only library that must
-be installed is Lennart Henning's ESPTelnet library which is used for the
+The software can be compiled using the Arduino GUI. The only library required
+is Lennart Henning's ESPTelnet library which is used for the
 both the Telnet server and the NMEA server.
 
 ### Configuration via Web Page
@@ -88,14 +98,22 @@ to configure a few parameters of the bridge. Among other things the page allows
 enabling or disabling of the serial and telnet logging windows and the port
 at which the NMEA server is listening. During the first start the software
 creates a configuration space in EEPROM and stores a few default parameters.
-The defaults are:
+The defaults have been chosen to aid in the debgging of the board during firts
+installation and can be changed accordingly after full operation has been
+achieved. The built in defaults are:
 
-- Serial logger disabled
-- Telnet logger disabled
+- Serial logger enabled
+- Telnet logger enabled
 - The default NMEA port is 3030
+- Activity LED enabled
 
-The hostname for the instrument is "wind" and can be changed in the software
-before programming (see seatalk_wifi.h file).
+An example of the web page is shown in the following picture.
+
+![Configuration Web Page](pictures/webpage.png)
+
+The default hostname for the instrument is "wind" and can be changed in the
+software before programming (see seatalk_wifi.h file) or at a later point
+via the configuration web page.
 
 The web page also lists the SeaTalk sentences that are supported by the bridge.
 
@@ -124,7 +142,7 @@ checking for RX errors and then assuming that any such error is due to parity
 violation, but when sending data the parity bit has to be handled
 as a 9th bit independent of the others which makes it impossible to use the
 hardware serial port TX pin to do this. When configured to use serial parity
-the ESP12 core sets parity based on the bt pattern to send and does not allow
+the ESP12 core sets parity based on the bit pattern to send and does not allow
 independently setting the value of the parity bit. For this reason
 the SeaTalk TX line is connected to a GPIO in the expectation that a the TX
 signal can be bit-banged out of it.
