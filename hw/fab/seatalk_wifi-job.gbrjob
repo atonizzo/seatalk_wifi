@@ -5,7 +5,7 @@
       "Application": "Pcbnew",
       "Version": "(6.99.0-2635-gfc1afa6298)"
     },
-    "CreationDate": "2022-08-07T14:50:02-07:00"
+    "CreationDate": "2022-08-15T15:51:57-07:00"
   },
   "GeneralSpecs": {
     "ProjectId": {
@@ -81,11 +81,6 @@
     {
       "Path": "seatalk_wifi-F_Fab.gbr",
       "FileFunction": "AssemblyDrawing,Top",
-      "FilePolarity": "Positive"
-    },
-    {
-      "Path": "seatalk_wifi-B_Fab.gbr",
-      "FileFunction": "AssemblyDrawing,Bot",
       "FilePolarity": "Positive"
     }
   ],

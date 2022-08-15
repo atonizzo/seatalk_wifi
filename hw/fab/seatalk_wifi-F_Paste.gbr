@@ -1,12 +1,12 @@
 %TF.GenerationSoftware,KiCad,Pcbnew,(6.99.0-2635-gfc1afa6298)*%
-%TF.CreationDate,2022-08-07T14:50:02-07:00*%
+%TF.CreationDate,2022-08-15T15:51:57-07:00*%
 %TF.ProjectId,seatalk_wifi,73656174-616c-46b5-9f77-6966692e6b69,rev?*%
 %TF.SameCoordinates,Original*%
 %TF.FileFunction,Paste,Top*%
 %TF.FilePolarity,Positive*%
 %FSLAX46Y46*%
 G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
-G04 Created by KiCad (PCBNEW (6.99.0-2635-gfc1afa6298)) date 2022-08-07 14:50:02*
+G04 Created by KiCad (PCBNEW (6.99.0-2635-gfc1afa6298)) date 2022-08-15 15:51:57*
 %MOMM*%
 %LPD*%
 G01*
@@ -128,6 +128,12 @@ D10*
 X146387499Y-97409999D03*
 X144812499Y-97409999D03*
 %TD*%
+D12*
+%TO.C,R12*%
+X132499999Y-95987499D03*
+X132499999Y-94412499D03*
+%TD*%
+D10*
 %TO.C,R6*%
 X132816699Y-92659199D03*
 X131241699Y-92659199D03*
