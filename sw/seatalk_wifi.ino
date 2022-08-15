@@ -1,3 +1,15 @@
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <EEPROM.h>
@@ -11,8 +23,8 @@ sensor_data_t sensor_data;
 #include "eeprom_helpers.h"
 #import "web_pages.h"
 
-#define WIFI_SSID                   ""
-#define WIFI_PASS                   ""
+#define WIFI_SSID                   "LindaRae"
+#define WIFI_PASS                   "goodlife"
 
 char cmd_payload[16];   // Holds the payload of the SeaTalk sentence.
 char nmea_message[96];  // Maximum NMEA sentence length is 82 bytes.
@@ -267,6 +279,8 @@ void handler_updater(void)
             31);        
     value = http_server.arg("colorize");
     sensor_data.status.colorize_prettyprint = value.toInt();
+    value = http_server.arg("led");
+    sensor_data.status.activity_led = value.toInt();
     http_server.send(200, "text/plain", "\r\n");
     commit_eeprom();
 }
@@ -277,14 +291,15 @@ void handler_get_status(void)
     sprintf(s,
             "ipaddr=%s&slogger=%d&tlogger=%d&"
             "slogger_baudrate=%d&server_port=%d&"
-            "hostname=%s&colorize=%d",
+            "hostname=%s&colorize=%d&led=%d",
             WiFi.localIP().toString().c_str(),
             sensor_data.status.serial_logger,
             sensor_data.status.telnet_logger,
             sensor_data.status.slogger_baudrate,
             sensor_data.server_port,
             sensor_data.hostname,
-            sensor_data.status.colorize_prettyprint);
+            sensor_data.status.colorize_prettyprint,
+            sensor_data.status.activity_led);
     http_server.send(200, "text/plain", s);
 }
 
@@ -364,9 +379,11 @@ void setup()
     {
         memset(&sensor_data, '\0', EEPROM_SIZE);
         // Set default values for the sensor_data structure.
-        sensor_data.status.serial_logger = 0;
-        sensor_data.status.telnet_logger = 0;
+        sensor_data.status.serial_logger = 1;
+        sensor_data.status.telnet_logger = 1;
         sensor_data.status.slogger_baudrate = 4;
+        sensor_data.status.colorize_prettyprint = 0;
+        sensor_data.status.activity_led = 1;
         sensor_data.server_port = NMEA_SERVER_DEFAULT_PORT;
         sensor_data.hostname[0] = '\0';
         strncat((char *)sensor_data.hostname, DEFAULT_HOSTNAME, 31);        
@@ -384,6 +401,7 @@ void setup()
 
     int seconds = 0;
 
+    Serial1.print("Connecting to WiFi: ");
     WiFi.mode(WIFI_STA);
     WiFi.hostname((char *)sensor_data.hostname);
     WiFi.begin(WIFI_SSID, WIFI_PASS);
@@ -400,7 +418,7 @@ void setup()
     Serial1.print("\r\n");
     if (WiFi.status() == WL_CONNECTED)
     {
-        Serial1.println("WiFi IP : " + WiFi.localIP().toString());
+        Serial1.println("WiFi IP: " + WiFi.localIP().toString());
         Serial1.println("Hostname: " + WiFi.hostname());
         // WiFi RF power output ranges from 0dBm to 20.5dBm.
         WiFi.setOutputPower(10);
@@ -600,6 +618,11 @@ void loop()
             break;
         }
         current_state = SM_STATE_PRETTYPRINT;
+        if (sensor_data.status.activity_led == 1)
+        {
+            digitalWrite(16, LOW);
+            ms_timer = millis() + 100;
+        }
         break;
     case SM_STATE_PRETTYPRINT:
         if ((sensor_data.status.serial_logger == 1) ||
@@ -645,8 +668,6 @@ void loop()
 
         sendout_strlogger();
         current_state = SM_STATE_SEEK_CMD;
-        digitalWrite(16, LOW);
-        ms_timer = millis() + 100;
         break;    
     default:
         break;

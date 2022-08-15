@@ -1,3 +1,15 @@
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 const char homepage[] = R"=====(
 <html>
 <head>
@@ -23,6 +35,8 @@ const char homepage[] = R"=====(
     document.getElementsByName("hostname")[0].value = urlParams.get('hostname');
     const colorize = urlParams.get('colorize');
     document.getElementsByName("colorize")[0].checked = (parseInt(colorize, 10) == 1);
+    const led = urlParams.get('led');
+    document.getElementsByName("led")[0].checked = (parseInt(led, 10) == 1);
   }
   function update_values()
   {
@@ -36,6 +50,8 @@ const char homepage[] = R"=====(
     url += "&hostname=" + document.getElementsByName("hostname")[0].value
     url += "&colorize=";
     url += (document.getElementsByName("colorize")[0].checked == true) ? 1 : 0
+    url += "&led=";
+    url += (document.getElementsByName("led")[0].checked == true) ? 1 : 0
     const xhttp=new XMLHttpRequest();
     xhttp.onload = function() {post_update(this);}
     xhttp.open("GET", url);
@@ -69,6 +85,7 @@ const char homepage[] = R"=====(
 <td>NMEA Port</td><td><input type="number" name="server_port" ></input></td>
 <td><button type="button" onclick="update_values()">Update</button></td></tr>
 <tr><td>Colorize Prettyprint</td><td><input type="checkbox" name="colorize" onclick="update_values()"></td></tr>
+<tr><td>Activity LED</td><td><input type="checkbox" name="led" onclick="update_values()"></td></tr>
 </table>
 </fieldset>
 <fieldset>

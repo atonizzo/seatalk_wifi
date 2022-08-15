@@ -18,10 +18,10 @@ the installer.
 ### Schematic
 ![Seatalk_wifi Schematic](pictures/seatalk_wifi.svg)
 
-During the development of the board I noticed that the Raymarine instrument I
-was connected to (an ST40 wind instrument) was very finnicky about loading of
-the SeaTalk serial line. To isolate the Raymarine instrument from the rest of
-the circuitry Q2 acts as a buffer.
+During the development of the board it was noticed that the Raymarine
+instrument that was used for development (an ST40 wind instrument) was very
+finnicky about loading of the SeaTalk serial line. To isolate the Raymarine
+instrument from the rest of the circuitry Q2 acts as a buffer.
 
 U1 implemnts a switching regulator rated at least to 2A. An original version
 of this board designed with a linear regulator showed that the regulator
@@ -47,11 +47,12 @@ installation would require powering this board from the same switched
 connection that powers the navigation station.
 
 On the left side of the board the pads are meant to be connected to a Raymarine
-SeaTalk instrument and are, from top to bottom:
+SeaTalk instrument. The color of the insulator in a typical SeaTalk cable is
+shown in parenthesis. From top to bottom:
 
-- GND (typically a wire with a black insulator or no insulator)
-- SeaTalk (typically a wire with a yellow insulator)
-- 12V (typically a wire with a red insulator)
+- GND (black or no insulator)
+- SeaTalk (yellow)
+- 12V (red)
 
 On the top side of the board the pads, from left to right, are:
 
@@ -88,9 +89,10 @@ should be pulsed **while the BOOT switch is kept pressed**. At this point
 the board is ready for the programmer to write the new software.
 
 ## Software
-The software can be compiled using the Arduino GUI. The only library required
-is Lennart Henning's ESPTelnet library which is used for the
-both the Telnet server and the NMEA server.
+The software can be compiled using the 
+[Arduino GUI](https://www.arduino.cc/en/software). The only library required
+is [Lennart Hennings' ESPTelnet library](https://github.com/LennartHennigs/ESPTelnet)
+which is used for both the Telnet server and the NMEA server.
 
 ### Configuration via Web Page
 The software runs a very simple web server that serves a single web page used
@@ -98,7 +100,7 @@ to configure a few parameters of the bridge. Among other things the page allows
 enabling or disabling of the serial and telnet logging windows and the port
 at which the NMEA server is listening. During the first start the software
 creates a configuration space in EEPROM and stores a few default parameters.
-The defaults have been chosen to aid in the debgging of the board during firts
+The defaults have been chosen to aid in the debgging of the board during initial
 installation and can be changed accordingly after full operation has been
 achieved. The built in defaults are:
 
@@ -117,11 +119,17 @@ via the configuration web page.
 
 The web page also lists the SeaTalk sentences that are supported by the bridge.
 
-### Telnet Logger
-The software runs a Telnet server that outputs a pretty print of all the
-commands received, exactly the same information that can be output on the
-serial port. This is not the actual NMEA data but rather descriptive
-information of each Seatalk command in the order that it was processed.
+### Serial Port and Telnet Logger
+The software outputs a pretty print of each sentence processed to a serial
+port or/and to a telnet port. The information output is not the actual NMEA
+data but rather descriptive information of each Seatalk command in the order
+that it was processed.
+
+### Activity LED
+The activity LED lights up for 100 milliseconds each time the software
+is in the ```SM_STATE_SEND``` state. This state is used to send This is useful
+in quickly determining if messages are being processed without connecting
+either a serial port cable or using the tenelt logger.
 
 ## Further Developmnent
 The board can be improved in a number of ways.
@@ -150,7 +158,4 @@ signal can be bit-banged out of it.
 Since SeaTalk is a multiple access protocol the ability to transmit sentences is
 made more challenging by the need to detect possible interfence from other
 instruments trying to talk over each other.
-
-# Contact
-<atonizzo@gmail.com>
 
