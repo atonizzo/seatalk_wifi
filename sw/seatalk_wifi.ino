@@ -20,11 +20,9 @@
 
 sensor_data_t sensor_data;
 
+#include "wifi_credentials.h"   // Define WIFI_SSID and WIFI_PASS here.
 #include "eeprom_helpers.h"
 #import "web_pages.h"
-
-#define WIFI_SSID                   "LindaRae"
-#define WIFI_PASS                   "goodlife"
 
 char cmd_payload[16];   // Holds the payload of the SeaTalk sentence.
 char nmea_message[96];  // Maximum NMEA sentence length is 82 bytes.
