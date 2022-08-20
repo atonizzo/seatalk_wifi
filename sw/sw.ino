@@ -18,6 +18,8 @@
 #include "ESPTelnet.h"   
 #include "seatalk_wifi.h"
 
+#define ACTIVITY_LED            16   
+
 sensor_data_t sensor_data;
 
 #include "wifi_credentials.h"   // Define WIFI_SSID and WIFI_PASS here.
@@ -189,12 +191,12 @@ void print_attribute(text_attribute_t c)
         char p[8];
         p[0] = '\0';
         append_text_attribute(p, c);
-        Serial1.print(p);
+        Serial.print(p);
     }
 }
 
 // From Hacker's Delight.
-bool calculate_parity(int a)
+bool calculate_parity(unsigned int a)
 {
     int y = a ^ (a >> 1);
     y = y ^ (y >> 2);
@@ -210,8 +212,8 @@ bool parity_bit(int c)
     //  of 3 different errors are present: Framing, parity and FIFO
     //  timout. Without madifying the standard library it is not
     //  possible to isolate the parity bit and thus this code makes the
-    //  somewhat educated assumption that when an error is present it
-    //  will be a parity violation.
+    //  somewhat educated assumption that when Serial.hasRxError()
+    //  returns an error it will be a parity violation.
     int has_rx_error = Serial.hasRxError();
     return should_parity ^ has_rx_error;
 }
@@ -393,13 +395,14 @@ void setup()
     Serial1.begin(baudrates[sensor_data.status.slogger_baudrate]);
     while (!Serial1);
 
+    Serial.print("\e[2J\r\n");    
     Serial1.print("\e[2J\r\n");    
     dump_eeprom();
     print_eeprom();
 
     int seconds = 0;
 
-    Serial1.print("Connecting to WiFi: ");
+    Serial.print("Connecting to WiFi: ");
     WiFi.mode(WIFI_STA);
     WiFi.hostname((char *)sensor_data.hostname);
     WiFi.begin(WIFI_SSID, WIFI_PASS);
@@ -409,15 +412,15 @@ void setup()
         seconds += 1;
         if (seconds == 15)
             break;
-        Serial1.print(seconds);
-        Serial1.print(" ");
+        Serial.print(seconds);
+        Serial.print(" ");
     }
 
-    Serial1.print("\r\n");
+    Serial.print("\r\n");
     if (WiFi.status() == WL_CONNECTED)
     {
-        Serial1.println("WiFi IP: " + WiFi.localIP().toString());
-        Serial1.println("Hostname: " + WiFi.hostname());
+        Serial.println("WiFi IP: " + WiFi.localIP().toString());
+        Serial.println("Hostname: " + WiFi.hostname());
         // WiFi RF power output ranges from 0dBm to 20.5dBm.
         WiFi.setOutputPower(10);
 
@@ -425,35 +428,35 @@ void setup()
         nmea_server.onConnect(nmea_server_connect);
         nmea_server.onReconnect(nmea_server_connect);
         nmea_server.onDisconnect(nmea_server_disconnect);
-        Serial1.print("NMEA Server Status: ");
+        Serial.print("NMEA Server Status: ");
         if (nmea_server.begin(sensor_data.server_port))
         {
             print_attribute(TEXT_ATTRIB_FG_GREEN);
-            Serial1.println("running.");
+            Serial.println("running.");
             print_attribute(TEXT_ATTRIB_NORMAL);
-            Serial1.print("NMEA Server Port: ");
-            Serial1.println(sensor_data.server_port);
+            Serial.print("NMEA Server Port: ");
+            Serial.println(sensor_data.server_port);
         }
         else
         {
             print_attribute(TEXT_ATTRIB_FG_RED);
-            Serial1.println("not connected.");
+            Serial.println("not connected.");
             print_attribute(TEXT_ATTRIB_NORMAL);
         }
 
         telnet_logger.onConnect(telnet_logger_connect);
         telnet_logger.onReconnect(telnet_logger_connect);
         telnet_logger.onDisconnect(telnet_logger_disconnect);
-        Serial1.print("Telnet Server Status: ");
+        Serial.print("Telnet Server Status: ");
         if (telnet_logger.begin(23))
         {
             print_attribute(TEXT_ATTRIB_FG_GREEN);
-            Serial1.println("running");
+            Serial.println("running");
         }
         else
         {
             print_attribute(TEXT_ATTRIB_FG_RED);
-            Serial1.println("not connected.");
+            Serial.println("not connected.");
         }
         print_attribute(TEXT_ATTRIB_NORMAL);
 
@@ -465,13 +468,15 @@ void setup()
         http_server.begin();
     }
     else    
-        Serial1.println("Can't connect to WiFi Network");
+        Serial.println("Can't connect to WiFi Network");
 
     if (sensor_data.status.serial_logger == 1)
         print_slogger_banner();
 
-    pinMode(16, OUTPUT);
-    digitalWrite(16, HIGH);
+    pinMode(ACTIVITY_LED, OUTPUT);
+    digitalWrite(ACTIVITY_LED, HIGH);
+    
+    ms_timer = 0;
 }
 
 void loop()
@@ -618,7 +623,7 @@ void loop()
         current_state = SM_STATE_PRETTYPRINT;
         if (sensor_data.status.activity_led == 1)
         {
-            digitalWrite(16, LOW);
+            digitalWrite(ACTIVITY_LED, LOW);
             ms_timer = millis() + 100;
         }
         break;

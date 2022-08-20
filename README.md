@@ -5,39 +5,41 @@ sentences generated are sent via a WiFi connection to a remote
 client. This connection can be directly used with chart plotters such as
 [OpenCPN](https://opencpn.org/).
 
-The main advantages of this board are:
+The advantages of this solution are:
 
 - Allows older instrumentation using SeaTalk1 to be connected to newer
-chartplotters using NMEA and WiFI
-- The board can be installed very close to the data source and
-does not require laying out data cables to a chart plotter. All that is needed
+chartplotters using NMEA via WiFI
+- The WiFi link allows the instrumentatio to be installed in out-of-the-way
+location thus freeing space in the navigation area
+- The board can be installed very close to the data source and does not
+require laying out data cables to a chart plotter. All that is needed
 is a 12 Volt connection to the battery
 
 ## Hardware
-The hardware is made up of a simple board that will connect to to a 12V source
-on the right side and to a Seatalk connector on the other (see PCB layout
-pictures below). The board provides 12V to power the target instrument so that
+The hardware is made up of a simple board with pads to connect to to a 12V
+source on one side and to a Seatalk connector on the other (see PCB layout
+pictures below). The board supplies 12V to power the target instrument so that
 the only connection needed for the system to work is a 12V from the boat
 electrical panel.
 
-The circuit is not fused and it is expected that a 1A fused be provided by
-the installer.
+The circuit is not fused and it is expected that a 1A fused be provided during
+the installation.
 
 ### Schematic
 ![Seatalk_wifi Schematic](pictures/seatalk_wifi.svg)
 
-During the development of the board I noticed that the Raymarine instrument I
-was connected to (an ST40 wind instrument) was very finnicky about loading of
-the SeaTalk serial line. To isolate the Raymarine instrument from the rest of
-the circuitry Q2 acts as a buffer.
+During the development of the circuit it was noticed that the Raymarine
+instrument being used (an ST40 wind instrument) was very sensitive about
+loading of the SeaTalk serial line. To isolate the SeaTalk data line from
+the rest of the circuitry Q2 acts as a buffer.
 
-U1 implemnts a switching regulator rated at least to 2A. An original version
-of this board designed with a linear regulator showed that the regulator
-tended to overheat, which prompted a redesign with a switching one.
+U1 implements a regulator rated to least 2A. An earlier version of this board
+designed with a linear regulator showed that the regulator tended to overheat,
+which prompted a redesign using a switching topology.
 
 ### PCB Layout
 
-The board has been designed with KiCad and the fabrication files are provided
+The board has been designed using KiCad and the fabrication files are provided
 in the fab/ directory.
 
 Board dimensions are 31 mm x 22 mm.
@@ -131,6 +133,14 @@ commands received, exactly the same information that can be output on the
 serial port. This is not the actual NMEA data but rather descriptive
 information of each Seatalk command in the order that it was processed.
 
+### Software Debug Port
+Since the Serial TX line of the programming cable (UART0_TXD in the schematic)
+is not shared with SeaTalk it is used to send out debug information that is
+useful during installation. To see the output of this port the terminal should
+be configured with the same setting as SeaTalk (8 bit, Even parity, 1 Stop bit).
+The information output shows the content of the configuration EEPROM as well
+as the output from the connection to a WiFi network.
+
 ## Further Developmnent
 The board can be improved in a number of ways.
 
@@ -141,29 +151,42 @@ processes the Seatalk sentences using a state machine and it makes rather
 trivial job to add new commands.
 
 ### Adding the Ability to Send SeaTalk Sentences
-The current release does not allow transmitting of Seatalk sentences simply
-because there was no need for it in the only ST40 instrument owned by the
-author. 
+The current release does not allow transmitting of Seatalk sentences because
+there was no need for it in the only ST40 instrument used for development. 
 
-In receive mode, the parity bit is extracted using a gimmick that involves
+In receive mode, the parity bit is extracted using a technique that involves
 checking for RX errors and then assuming that any such error is due to parity
-violation, but when sending data the parity bit has to be handled
+violation (this is required by the way errors are handled in the serial library
+of the ESP8266 device), but when sending data the parity bit has to be handled
 as a 9th bit independent of the others which makes it impossible to use the
 hardware serial port TX pin to do this. When configured to use serial parity
 the ESP12 core sets parity based on the bit pattern to send and does not allow
-independently setting the value of the parity bit. For this reason
-the SeaTalk TX line is connected to a GPIO in the expectation that a the TX
-signal can be bit-banged out of it.
+independently setting the value of the parity bit. For this reason the SeaTalk
+TX line is connected to a GPIO in the expectation that a the TX signal can be
+bit-banged out of it.
 
-Since SeaTalk is a multiple access protocol the ability to transmit sentences is
-made more challenging by the need to detect possible interfence from other
-instruments trying to talk over each other.
+Since SeaTalk is a multiple access protocol the ability to transmit sentences
+requires the need to detect possible interfence from other instruments trying
+to talk over each other. Since the SeaTalk line is a single one, the
+transmitted data is also received back by the bridge, which can compare it
+with the data transmitted to detect collisions.
 
-## Serial Bridge
-The addition of R12 allows the board to be used as a serial to WIFI bridge. In
-this mode Q1 and Q2 are not installed, R12 is. Now the center pad can be
-connected to a TX pint of a NMEA device and the serial stream of NMEA
-sentences can be sent out to WIFI.
+## Serial Bridge   
+R12 allows the board to be used as a serial to WIFI bridge. In this mode Q1
+and Q2 are not installed, R12 is. Now the center pad can be connected to a TX
+pin of the RS232 port of a NMEA device and the serial stream of NMEA sentences
+can be sent out to WIFI.
+
+# Holder for ST40 devices
+With the NMEA data now sent via WiFI the ST40 device can optionally be
+installed in a more secluded place, clearing up some space in the navigation
+station. A 3D printed mount allows hiding the PCB behind the instrument and
+holding the instrument in place with an M3x8 pinch screw.
+
+Original FreeCAD file and STEP files are provided in the ```holder```
+directory.
+
+![ST40 Holder](pictures/ST40_holder.png)
 
 # Contact
 <atonizzo@gmail.com>

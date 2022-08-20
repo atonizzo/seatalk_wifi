@@ -14,95 +14,98 @@
 
 void dump_eeprom(void)
 {
-    Serial1.print("\r\n");
-    // Round up the length to the next 4 words.
-    Serial1.print("         0  1  2  3  4  5  6  7  8  9"
-                   "  A  B  C  D  E  F\r\n");
-    Serial1.print("         ----------------------------"
-                   "-------------------");
+    Serial.print("\r\n");
+
+    print_attribute(TEXT_ATTRIB_FG_BLUE);
+    Serial.print("     0 1 2 3 4 5 6 7 8 9"
+                   " A B C D E F\r\n");
+    Serial.print("     --------------------------------");
+    print_attribute(TEXT_ATTRIB_NORMAL);
     for (int i = 0; i < EEPROM.length(); i += 16)
     {
         char s[16];
         sprintf(s, "\r\n%04X ", i);
-        Serial1.print(s);
+        print_attribute(TEXT_ATTRIB_FG_BLUE);
+        Serial.print(s);
+        print_attribute(TEXT_ATTRIB_NORMAL);
         for (int j = 0; j < 16; j += sizeof(uint8_t))
         {
             sprintf(s, "%02X", EEPROM.read(i + j));
-            Serial1.print(s);
+            Serial.print(s);
         }
-        Serial1.print("  ");
+        Serial.print("  ");
         for (int j = 0; j < 16; j++)
         {
             char ch = EEPROM.read(i + j);
             if ((ch >= ' ') && (ch <= '~'))
             {
                 sprintf(s, "%c", ch);
-                Serial1.print(s);
+                Serial.print(s);
             }
             else
-                Serial1.print(".");
+                Serial.print(".");
         }
     }
-    Serial1.print("\r\n\r\n");
+    Serial.print("\r\n\r\n");
 }
 
 void print_eeprom(void)
 {
-    Serial1.print("EEPROM Contents");
-    Serial1.print("\r\n-----------------------------------------");
-    Serial1.print("\r\nSerial Logger: ");
+    Serial.print("EEPROM Contents");
+    Serial.print("\r\n-----------------------------------------");
+    Serial.print("\r\nSerial Logger: ");
     if (sensor_data.status.serial_logger == 0)
     {
         print_attribute(TEXT_ATTRIB_FG_RED);
-        Serial1.print("Disabled");
+        Serial.print("Disabled");
     }
     else    
     {
         print_attribute(TEXT_ATTRIB_FG_GREEN);
-        Serial1.print("Enabled");
+        Serial.print("Enabled");
     }
     print_attribute(TEXT_ATTRIB_NORMAL);
-    Serial1.print("\r\nBaud Rate: ");
-    Serial1.print(baudrates[sensor_data.status.slogger_baudrate]);
-    Serial1.print("\r\nTelnet Logger: ");
+    Serial.print("\r\nBaud Rate: ");
+    Serial.print(baudrates[sensor_data.status.slogger_baudrate]);
+    Serial.print("\r\nTelnet Logger: ");
     if (sensor_data.status.telnet_logger == 0)
     {
         print_attribute(TEXT_ATTRIB_FG_RED);
-        Serial1.print("Disabled");
+        Serial.print("Disabled");
     }
     else    
     {
         print_attribute(TEXT_ATTRIB_FG_GREEN);
-        Serial1.print("Enabled");
+        Serial.print("Enabled");
     }
     print_attribute(TEXT_ATTRIB_NORMAL);
-    Serial1.print("\r\nHostname: ");
-    Serial1.print((char *)sensor_data.hostname);
-    Serial1.print("\r\nServer Port: ");
-    Serial1.print(sensor_data.server_port);
-    Serial1.print("\r\nColorize Prettyprint: ");
+    Serial.print("\r\nHostname: ");
+    Serial.print((char *)sensor_data.hostname);
+    Serial.print("\r\nServer Port: ");
+    Serial.print(sensor_data.server_port);
+    Serial.print("\r\nColorize Prettyprint: ");
     if (sensor_data.status.colorize_prettyprint == 0)
     {
-        Serial1.print("Disabled");
+        Serial.print("Disabled");
     }
     else    
     {
         print_attribute(TEXT_ATTRIB_FG_GREEN);
-        Serial1.print("Enabled");
+        Serial.print("Enabled");
         print_attribute(TEXT_ATTRIB_NORMAL);
     }
-    Serial1.print("\r\nActivity LED: ");
+    Serial.print("\r\nActivity LED: ");
     if (sensor_data.status.activity_led == 0)
     {
-        Serial1.print("Disabled");
+        Serial.print("Disabled");
     }
     else    
     {
         print_attribute(TEXT_ATTRIB_FG_GREEN);
-        Serial1.print("Enabled");
+        Serial.print("Enabled");
         print_attribute(TEXT_ATTRIB_NORMAL);
     }
-    Serial1.print("\r\n");
+    Serial.print("\r\n");
 }
 
 void commit_eeprom(void)
