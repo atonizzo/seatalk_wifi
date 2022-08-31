@@ -9,6 +9,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// Author: Anthony Tonizzo - 2022
 
 #ifndef __SEATALK_WIFI_H__
 #define __SEATALK_WIFI_H__
@@ -82,8 +84,8 @@ typedef enum
     TEXT_ATTRIB_BG_WHITE   = 47
 } text_attribute_t;
 
-#define SEATALK_CMD_COLUMN          20
-#define SEATALK_ARG_COLUMN          48
+#define SEATALK_CMD_COLUMN          32
+#define SEATALK_ARG_COLUMN          60
 
 #define SEATALK_DATARATE            4800
 #define LOGPORT_DATARATE            115200
@@ -101,21 +103,49 @@ struct __status
 };
 typedef struct __status status_t;
 
+struct __wind_data
+{
+    volatile uint32_t filter_angle_enable  : 1;
+    volatile uint32_t filter_speed_enable  : 1;
+    volatile uint32_t angle_ma_length      : 8;
+    volatile uint32_t speed_ma_length      : 8;
+             uint32_t                      : 14;
+};
+typedef struct __wind_data wind_data_t;
+
 struct __sensor_data
 {
     volatile status_t status;
     volatile uint32_t server_port;
     volatile uint8_t hostname[32];
-    volatile uint8_t reserved[20];
+    wind_data_t wind_data;
+    volatile uint8_t reserved[8];
     volatile uint32_t magic_number;
 };
 typedef struct __sensor_data sensor_data_t;
+extern sensor_data_t sensor_data, sensor_data_mem;
+
 #define EEPROM_SIZE                 sizeof(sensor_data_t)
 #define MAGIC_NUMBER                0xABBACAFE
-
 #define DEFAULT_HOSTNAME            "wind"
+
+#define WIND_ANGLE_FILTER_TAPS  16
+extern unsigned int wind_angle_history[WIND_ANGLE_FILTER_TAPS];
+extern unsigned int last_wind_angle;
+
+#define WIND_SPEED_FILTER_TAPS  16
+extern unsigned int wind_speed_history[WIND_SPEED_FILTER_TAPS];
+extern unsigned int last_wind_speed;
+
+#define ACTIVITY_LED            12  
 
 extern const int baudrates[];
 void print_attribute(text_attribute_t);
+
+extern const char homepage[];
+
+void commit_eeprom(void);
+void dump_eeprom(void);
+void print_eeprom(void);
 
 #endif

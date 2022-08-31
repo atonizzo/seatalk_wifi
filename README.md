@@ -16,14 +16,16 @@ require laying out data cables to a chart plotter. All that is needed
 is a 12 Volt connection to the battery
 
 ## Hardware
-The hardware is made up of a simple board with pads to connect to to a 12V
-source on one side and to a Seatalk connector on the other (see PCB layout
-pictures below). The board supplies 12V to power the target instrument so that
-the only connection needed for the system to work is a 12V from the boat
+The hardware is a simple board with pads designed to connect to to a 12V
+source on one side (typically a switched and fused boat battery) and to
+a Seatalk connector on the other 
+(see <a href="### PCB Layout">PCB layout pictures</a>). The
+board supplies 12V to power the target instrument so that the only
+connection needed for the system to work is a 12V from the boat
 electrical panel.
 
-The circuit is not fused and it is expected that a 1A fused be provided during
-the installation.
+The circuit is not fused and it is expected that a 1A fused be provided
+during the installation.
 
 ### Schematic
 ![Seatalk_wifi Schematic](pictures/seatalk_wifi.svg)
@@ -52,37 +54,45 @@ On the right side of the board the pads, from top to bottom, are:
 - GND
 - 12V (unfused, use a 1A fuse)
 
-These pads are connected to the boat battery via a fused connection. A better
-installation would require powering this board from the same switched
-connection that powers the navigation station.
+These pads are connected to the boat battery. A better installation
+would require powering this board from the same switched connection
+that powers the navigation station.
 
-On the left side of the board the pads are meant to be connected to a Raymarine
-SeaTalk instrument and are, from top to bottom:
+On the left side of the board the pads are meant to be connected to a
+Raymarine SeaTalk instrument. A SeaTalk1 cable has 3 wires that are
+color coded and the typical color of the insulating jacket is shown
+in the list. From top to bottom:
 
-- GND (typically a wire with a black insulator or no insulator)
-- SeaTalk (typically a wire with a yellow insulator)
-- 12V (typically a wire with a red insulator)
+| Function    | Jacket Color       |
+| ----------- | -----------        |
+| GND         | black or bare wire |
+| SeaTalk     | yellow             |
+| +12V        |  red               | 
 
 On the top side of the board the pads, from left to right, are:
 
 - Serial Logger (unmarked on the PCB) This pin is connected to the TX pin
-of serial port 2 of the ESP 12 and emits serial data that is mainly
-used for debugging of software. If enabled by the user it can also output a
-pretty print of each SeaTalk sentence as they are handled by the software
+of serial port 2 of the ESP12 and -if enabled by the user- emits a
+pretty print of all the commands handled by the hardware 
+(see <a href="### Serial Logger">Serial Logger</a>).
 
 - Programming cable RX line (marked with R in the layout). This is connected
 to the RX pin of serial port 1 of the ESP12 and is primarily used to program
 the device. Serial port 1 is used for both programming the board as
-well as to receive the SeaTalk sentences from the instrument. This means that
-this pin must be disconnected from the programmer before resetting the board
-to to prevent interference between the programmer hardware and the SeaTalk
-instrument. Failure to disconnect this cable during regular use will prevent
-the SeaTalk sentences from being received by the MCU
+well as to receive the SeaTalk sentences from the instrument. During
+development this means that this pin must be disconnected from the
+programming cable before resetting the board to to prevent interference between
+the programmer hardware and the SeaTalk instrument. Failure to disconnect
+this cable during regular use will prevent the SeaTalk sentences from
+being received by the MCU
 
 - Programming cable TX line (marked with T in the layout) is connected to the
-TX pin of the ESP12 and is only used during programming
+TX pin of the ESP12 and is only used during programming. It can also be
+used to output debug information during debug but the terminal must be
+programmed with the same serial parameters used by SeaTalk, which are
+usually 4800 bauds, 8 bits, Even parity, 1 Stop bit.
 
-Since the board is run at 3.3V the typical programming is performed with a
+Since the board power supply is 3.3V the typical programming is performed with a
 USB to serial converter connected to pads R, T and GND. If no further software
 development is expected the programming cable should be disconnected from the
 board and the pads left unconnected.
@@ -122,16 +132,50 @@ An example of the web page is shown in the following picture.
 ![Configuration Web Page](pictures/webpage.png)
 
 The default hostname for the instrument is "wind" and can be changed in the
-software before programming (see seatalk_wifi.h file) or at a later point
-via the configuration web page.
+software before programming (see [sw/seatalk_wifi.h](sw/seatalk_wifi.h))
+or at a later point via the configuration web page.
 
 The web page also lists the SeaTalk sentences that are supported by the bridge.
+
+#### Configuration for Wind Instrument
+In gusty wind conditions the wind angle -and to a lesser extent the speed- returned
+by the wind instrument are subject to very quick jumps only to then return to
+prevailing conditions. To filter out some of the noise introduced by these
+jumps the angle and speed data can be independently filtered by a simple
+moving average filter. Whether these filters are enabled and their lenght
+can be configured from the web page in the fieldset specific to the wind
+instrument.
+
+### Serial Logger
+A timestamped pretty print of all the commands handled by the bridge is
+printed out to the serial logger, connected to Serial1 (for wiring information
+see <a href="#### Front Side">Front Side</a>). This is not the actual NMEA
+data but rather descriptive information of each Seatalk command in the
+order that it was processed.
+
+In the log -and assuming the coloring is enabled- the command byte is typically
+printed in blue, the payload in the regular terminal color, the name of the
+command in green and the arguments in terminal color.
+
+Errors are also logged. In this case the byte that caused the error is shown
+in red. If any error occurs the entire packet received up until that moment
+is tossed and the software will start seeking another command to interpret.
+There are 3 types of errors:
+
+- Unrecognized commands, which are commands with the parity bit set but
+that are not among those recognized by the software
+- Parity violations, where a payload byte was received with the parity
+bit set
+- Framing violations, where one of the payload bytes was received that
+was not consistent with the command being handled.
+
+In the latter 2 cases the argument column provides information about
+the offending byte.
 
 ### Telnet Logger
 The software runs a Telnet server that outputs a pretty print of all the
 commands received, exactly the same information that can be output on the
-serial port. This is not the actual NMEA data but rather descriptive
-information of each Seatalk command in the order that it was processed.
+serial port.
 
 ### Software Debug Port
 Since the Serial TX line of the programming cable (UART0_TXD in the schematic)
@@ -145,12 +189,13 @@ as the output from the connection to a WiFi network.
 The board can be improved in a number of ways.
 
 ### Handling Additional SeaTalk Sentences
-The only instrument the author has is an ST40 wind instrument and the messages
-that are emitted by it are those bridged in the current release. The software
-processes the Seatalk sentences using a state machine and it makes rather
-trivial job to add new commands.
+The only instrument available for development was an ST40 wind instrument and
+the messages that are emitted by that instrument are the only one currently
+recognized by the software. The software processes the Seatalk sentences using
+a state machine and it makes rather trivial job to add code that handles new
+sentences.
 
-### Adding the Ability to Send SeaTalk Sentences
+### Adding the Ability to Transmit SeaTalk Sentences
 The current release does not allow transmitting of Seatalk sentences because
 there was no need for it in the only ST40 instrument used for development. 
 
@@ -172,10 +217,18 @@ transmitted data is also received back by the bridge, which can compare it
 with the data transmitted to detect collisions.
 
 ## Serial Bridge   
-R12 allows the board to be used as a serial to WIFI bridge. In this mode Q1
-and Q2 are not installed, R12 is. Now the center pad can be connected to a TX
-pin of the RS232 port of a NMEA device and the serial stream of NMEA sentences
-can be sent out to WIFI.
+R12 allows the board to be used as a receive-only serial to WIFI bridge. In 
+order to use this feature, the changes to the schematic are:
+
+| Remove | Install |
+| -------| --------|
+| Q1     | R12     |
+| Q2     |         |
+| R9     |         | 
+
+Now the center pad can be connected to a TX pin of the RS232 port of a
+NMEA device and the serial stream of NMEA sentences can be sent out to
+WIFI.
 
 # Holder for ST40 devices
 With the NMEA data now sent via WiFI the ST40 device can optionally be
