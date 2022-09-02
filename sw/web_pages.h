@@ -32,58 +32,45 @@ const char homepage[] = R"=====(
   function pull_settings(xhttp) {
     const urlParams = new URLSearchParams(xhttp.responseText);
     document.getElementsByName("ipaddr")[0].innerHTML = urlParams.get('ipaddr');
-    const slogger = urlParams.get('slogger');
-    document.getElementsByName("slogger")[0].checked = (parseInt(slogger, 10) == 1);
-    const tlogger = urlParams.get('tlogger');
-    document.getElementsByName("tlogger")[0].checked = (parseInt(tlogger, 10) == 1);
-    const baud = urlParams.get('slogger_baudrate');
-    document.getElementsByName("slogger_baudrate")[0].selectedIndex = parseInt(baud, 10);
-    const port = urlParams.get('server_port');
-    document.getElementsByName("server_port")[0].valueAsNumber = parseInt(port, 10);
+    document.getElementsByName("slogger")[0].checked = (parseInt(urlParams.get('slogger'), 10) == 1);
+    document.getElementsByName("tlogger")[0].checked = (parseInt(urlParams.get('tlogger'), 10) == 1);
+    document.getElementsByName("slogger_baudrate")[0].selectedIndex = parseInt(urlParams.get('slogger_baudrate'), 10);
+    document.getElementsByName("server_port")[0].valueAsNumber = parseInt(urlParams.get('server_port'), 10);
     document.getElementsByName("hostname")[0].value = urlParams.get('hostname');
-    const colorize = urlParams.get('colorize');
-    document.getElementsByName("colorize")[0].checked = (parseInt(colorize, 10) == 1);
-    const led = urlParams.get('led');
-    document.getElementsByName("led")[0].checked = (parseInt(led, 10) == 1);
-    const ma_angle = urlParams.get('filter_angle_enable');
-    document.getElementsByName("filter_angle")[0].checked = (parseInt(ma_angle, 10) == 1);
-    const ma_speed = urlParams.get('speed_angle_enable');
-    document.getElementsByName("filter_speed")[0].checked = (parseInt(ma_speed, 10) == 1);
+    document.getElementsByName("nmea_talker")[0].value = urlParams.get('nmea_talker').substr(0, 2);
+    document.getElementsByName("colorize")[0].checked = (parseInt(urlParams.get('colorize'), 10) == 1);
+    document.getElementsByName("led")[0].checked = (parseInt(urlParams.get('led'), 10) == 1);
   }
   function pull_wind_settings(xhttp) {
     const urlParams = new URLSearchParams(xhttp.responseText);
-    const filter_angle = urlParams.get('filter_angle_enable');
-    document.getElementsByName("filter_angle_enable")[0].checked = (parseInt(filter_angle, 10) == 1);
-    document.getElementsByName("angle_slider")[0].disabled = (parseInt(filter_angle, 10) == 0)
-    const filter_speed = urlParams.get('filter_speed_enable');
-    document.getElementsByName("filter_speed_enable")[0].checked = (parseInt(filter_speed, 10) == 1);
-    document.getElementsByName("speed_slider")[0].disabled = (parseInt(filter_speed, 10) == 0)
-    document.getElementsByName("angle_slider")[0].attributes.max.value = 
-                        parseInt(urlParams.get('filter_angle_max'), 10);
-    document.getElementsByName("speed_slider")[0].attributes.max.value = 
-                        parseInt(urlParams.get('filter_speed_max'), 10);
-    document.getElementsByName("angle_slider")[0].valueAsNumber = 
-                        parseInt(urlParams.get('filter_angle_len'), 10);
-    document.getElementsByName("speed_slider")[0].valueAsNumber = 
-                        parseInt(urlParams.get('filter_speed_len'), 10);
-    document.getElementsByName("slider_angle_len")[0].innerHTML =
-        "" + parseInt(urlParams.get('filter_angle_len'), 10)
-    document.getElementsByName("slider_speed_len")[0].innerHTML =
-        "" + parseInt(urlParams.get('filter_speed_len'), 10)
+    document.getElementsByName("filter_angle_enable")[0].checked = (parseInt(urlParams.get('filter_angle_enable'), 10) == 1);
+    document.getElementsByName("angle_slider")[0].disabled = (parseInt(urlParams.get('filter_angle_enable'), 10) == 0)
+    document.getElementsByName("filter_speed_enable")[0].checked = (parseInt(urlParams.get('filter_speed_enable'), 10) == 1);
+    document.getElementsByName("speed_slider")[0].disabled = (parseInt(urlParams.get('filter_speed_enable'), 10) == 0)
+    document.getElementsByName("angle_slider")[0].attributes.max.value = parseInt(urlParams.get('filter_angle_max'), 10);
+    document.getElementsByName("speed_slider")[0].attributes.max.value = parseInt(urlParams.get('filter_speed_max'), 10);
+    document.getElementsByName("angle_slider")[0].valueAsNumber = parseInt(urlParams.get('filter_angle_len'), 10);
+    document.getElementsByName("speed_slider")[0].valueAsNumber = parseInt(urlParams.get('filter_speed_len'), 10);
+    document.getElementsByName("slider_angle_len")[0].innerHTML = "" + parseInt(urlParams.get('filter_angle_len'), 10)
+    document.getElementsByName("slider_speed_len")[0].innerHTML = "" + parseInt(urlParams.get('filter_speed_len'), 10)
   }
   function push_settings()
   {
-    url = "/push_settings?slogger=";
+    url = "/push_settings?slogger="
     url += (document.getElementsByName("slogger")[0].checked == true) ? 1 : 0
-    url += "&tlogger=";
+    url += "&tlogger="
     url += (document.getElementsByName("tlogger")[0].checked == true) ? 1 : 0
     url += "&slogger_baud="
     url += document.getElementsByName("slogger_baudrate")[0].selectedIndex
-    url += "&server_port=" + document.getElementsByName("server_port")[0].value
-    url += "&hostname=" + document.getElementsByName("hostname")[0].value
-    url += "&colorize=";
+    url += "&server_port="
+    url += document.getElementsByName("server_port")[0].value
+    url += "&hostname="
+    url += document.getElementsByName("hostname")[0].value
+    url += "&nmea_talker="
+    url += document.getElementsByName("nmea_talker")[0].value.substr(0, 2)
+    url += "&colorize="
     url += (document.getElementsByName("colorize")[0].checked == true) ? 1 : 0
-    url += "&led=";
+    url += "&led="
     url += (document.getElementsByName("led")[0].checked == true) ? 1 : 0
     const xhttp=new XMLHttpRequest();
     xhttp.onload = function() {post_update(this);}
@@ -92,18 +79,12 @@ const char homepage[] = R"=====(
   }
   function push_wind_settings()
   {
-    url = "/push_wind_settings?filter_angle_enable=";
-    url += (document.getElementsByName("filter_angle_enable")[0].checked == true) ? 1 : 0
-    document.getElementsByName("angle_slider")[0].disabled =
-        (document.getElementsByName("filter_angle_enable")[0].checked == false)
-    url += "&filter_speed_enable=";
-    url += (document.getElementsByName("filter_speed_enable")[0].checked == true) ? 1 : 0
-    document.getElementsByName("speed_slider")[0].disabled =
-        (document.getElementsByName("filter_speed_enable")[0].checked == false)
-    url += "&angle_length=";
-    url += document.getElementsByName("angle_slider")[0].valueAsNumber
-    url += "&speed_length=";
-    url += document.getElementsByName("speed_slider")[0].valueAsNumber
+    url = "/push_wind_settings?filter_angle_enable=" + (document.getElementsByName("filter_angle_enable")[0].checked == true) ? 1 : 0
+    document.getElementsByName("angle_slider")[0].disabled = (document.getElementsByName("filter_angle_enable")[0].checked == false)
+    url += "&filter_speed_enable=" + (document.getElementsByName("filter_speed_enable")[0].checked == true) ? 1 : 0
+    document.getElementsByName("speed_slider")[0].disabled = (document.getElementsByName("filter_speed_enable")[0].checked == false)
+    url += "&angle_length=" + document.getElementsByName("angle_slider")[0].valueAsNumber
+    url += "&speed_length=" + document.getElementsByName("speed_slider")[0].valueAsNumber
     const xhttp=new XMLHttpRequest();
     xhttp.onload = function() {post_update(this);}
     xhttp.open("GET", url);
@@ -144,6 +125,9 @@ const char homepage[] = R"=====(
        <td><button type="button" onclick="push_settings()">Update</button></td></tr>
 <td>NMEA Port</td><td><input type="number" name="server_port" ></input></td>
 <td><button type="button" onclick="push_settings()">Update</button></td></tr>
+<tr><td>NMEA Talker</td><td><input type="text" name="nmea_talker" required
+       minlength="2" maxlength="2" size="10"></td>
+       <td><button type="button" onclick="push_settings()">Update</button></td></tr>
 <tr><td>Colorize Prettyprint</td><td><input type="checkbox" name="colorize" onclick="push_settings()"></td></tr>
 <tr><td>Activity LED</td><td><input type="checkbox" name="led" onclick="push_settings()"></td></tr>
 </table>

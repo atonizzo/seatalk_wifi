@@ -27,7 +27,6 @@ sensor_data_t sensor_data, sensor_data_mem;
 
 char cmd_payload[16];   // Holds the payload of the SeaTalk sentence.
 char nmea_message[96];  // Maximum NMEA sentence length is 82 bytes.
-const char *nmea_talker = "LR";
 int current_state = SM_STATE_SEEK_CMD;
 
 unsigned int wind_angle_history[WIND_ANGLE_FILTER_TAPS];
@@ -70,8 +69,9 @@ ESP8266WebServer http_server(80);
 
 // This is the server that pushes the NMEA 0183 sentances to
 //  requesting clients.
-ESPTelnet nmea_server;
-bool nmea_server_connected = false;
+ESPTelnet nmea_server_pri, nmea_server_sec;
+bool nmea_server_pri_connected = false;
+bool nmea_server_sec_connected = false;
 
 ESPTelnet telnet_logger;
 bool telnet_logger_connected = false;
@@ -103,14 +103,24 @@ static void telnet_logger_disconnect(String ip)
     telnet_logger_connected = false;
 }
 
-static void nmea_server_connect(String ip)
+static void nmea_server_pri_connect(String ip)
 {
-    nmea_server_connected = true;
+    nmea_server_pri_connected = true;
 }
 
-static void nmea_server_disconnect(String ip)
+static void nmea_server_pri_disconnect(String ip)
 {
-    nmea_server_connected = false;
+    nmea_server_pri_connected = false;
+}
+
+static void nmea_server_sec_connect(String ip)
+{
+    nmea_server_sec_connected = true;
+}
+
+static void nmea_server_sec_disconnect(String ip)
+{
+    nmea_server_sec_connected = false;
 }
 
 int append_blanks(char *p, unsigned int to, unsigned int from)
@@ -303,8 +313,10 @@ void handler_push_settings(void)
             31);        
     value = http_server.arg("colorize");
     sensor_data.status.colorize_prettyprint = value.toInt();
-    value = http_server.arg("led");
-    sensor_data.status.activity_led = value.toInt();
+    sensor_data.status.activity_led = http_server.arg("led").toInt();
+    sensor_data.nmea_talker[0] = toupper(http_server.arg("nmea_talker").c_str()[0]);
+    sensor_data.nmea_talker[1] = toupper(http_server.arg("nmea_talker").c_str()[1]);
+    sensor_data.nmea_talker[3] = '\0';
     http_server.send(200, "text/plain", "\r\n");
     commit_eeprom();
 }
@@ -330,7 +342,8 @@ void handler_pull_settings(void)
     sprintf(s,
             "ipaddr=%s&slogger=%d&tlogger=%d&"
             "slogger_baudrate=%d&server_port=%d&"
-            "hostname=%s&colorize=%d&led=%d",
+            "hostname=%s&colorize=%d&led=%d&"
+            "nmea_talker=%s",
             WiFi.localIP().toString().c_str(),
             sensor_data.status.serial_logger,
             sensor_data.status.telnet_logger,
@@ -338,7 +351,8 @@ void handler_pull_settings(void)
             sensor_data.server_port,
             sensor_data.hostname,
             sensor_data.status.colorize_prettyprint,
-            sensor_data.status.activity_led);
+            sensor_data.status.activity_led,
+            sensor_data.nmea_talker);
     http_server.send(200, "text/plain", s);
 }
 
@@ -476,6 +490,7 @@ void setup()
         sensor_data.server_port = NMEA_SERVER_DEFAULT_PORT;
         sensor_data.hostname[0] = '\0';
         strncat((char *)sensor_data.hostname, DEFAULT_HOSTNAME, 31);        
+        strncpy((char *)sensor_data.nmea_talker, NMEA_DEFAULT_TALKER, 2);        
         sensor_data.wind_data.filter_angle_enable = 1;
         sensor_data.wind_data.filter_speed_enable = 1;
         sensor_data.wind_data.angle_ma_length = 10;
@@ -512,24 +527,43 @@ void setup()
     Serial.print("\r\n");
     if (WiFi.status() == WL_CONNECTED)
     {
-        Serial.print("MAC Address: " + WiFi.macAddress());
+        Serial.println("MAC Address: " + WiFi.macAddress());
         Serial.println("WiFi IP: " + WiFi.localIP().toString());
         Serial.println("Hostname: " + WiFi.hostname());
         // WiFi RF power output ranges from 0dBm to 20.5dBm.
         WiFi.setOutputPower(10);
 
-        // Start the NMEA bridge.
-        nmea_server.onConnect(nmea_server_connect);
-        nmea_server.onReconnect(nmea_server_connect);
-        nmea_server.onDisconnect(nmea_server_disconnect);
-        Serial.print("NMEA Server Status: ");
-        if (nmea_server.begin(sensor_data.server_port))
+        // Start the NMEA servers.
+        nmea_server_pri.onConnect(nmea_server_pri_connect);
+        nmea_server_pri.onReconnect(nmea_server_pri_connect);
+        nmea_server_pri.onDisconnect(nmea_server_pri_disconnect);
+        Serial.print("Primary NMEA Server Status: ");
+        if (nmea_server_pri.begin(sensor_data.server_port))
         {
             print_attribute(TEXT_ATTRIB_FG_GREEN);
             Serial.println("running.");
             print_attribute(TEXT_ATTRIB_NORMAL);
             Serial.print("NMEA Server Port: ");
             Serial.println(sensor_data.server_port);
+        }
+        else
+        {
+            print_attribute(TEXT_ATTRIB_FG_RED);
+            Serial.println("not connected.");
+            print_attribute(TEXT_ATTRIB_NORMAL);
+        }
+
+        nmea_server_sec.onConnect(nmea_server_sec_connect);
+        nmea_server_sec.onReconnect(nmea_server_sec_connect);
+        nmea_server_sec.onDisconnect(nmea_server_sec_disconnect);
+        Serial.print("Secondary NMEA Server Status: ");
+        if (nmea_server_sec.begin(sensor_data.server_port + 1))
+        {
+            print_attribute(TEXT_ATTRIB_FG_GREEN);
+            Serial.println("running.");
+            print_attribute(TEXT_ATTRIB_NORMAL);
+            Serial.print("NMEA Server Port: ");
+            Serial.println(sensor_data.server_port + 1);
         }
         else
         {
@@ -586,7 +620,8 @@ void loop()
     if (millis() > ms_timer)
         digitalWrite(16, HIGH);
         
-    nmea_server.loop();
+    nmea_server_pri.loop();
+    nmea_server_sec.loop();
     if (sensor_data.status.telnet_logger == 1)
         telnet_logger.loop();
     http_server.handleClient();
@@ -711,18 +746,22 @@ void loop()
         {
         case SEATALK_APPARENT_WIND_SPEED:
         case SEATALK_APPARENT_WIND_ANGLE:
-            if (nmea_server_connected == true)
+            if ((nmea_server_pri_connected == true) ||
+                (nmea_server_sec_connected == true))
             {
                 // Speed is always in knots.
                 sprintf(nmea_message,
                         "$%sMWV,%3.1f,R,%2.1f,N,A*",
-                        nmea_talker,
+                        sensor_data.nmea_talker,
                         apparent_wind_angle,
                         apparent_wind_speed);
                 sprintf(nmea_message + strlen(nmea_message),
                         "%02X\r\n",
                         nmea_compute_checksum(nmea_message));
-                nmea_server.print(nmea_message);
+            if (nmea_server_pri_connected == true)
+                nmea_server_pri.print(nmea_message);
+            if (nmea_server_sec_connected == true)
+                nmea_server_sec.print(nmea_message);
             }
             break;
         default:

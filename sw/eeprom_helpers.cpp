@@ -80,6 +80,8 @@ void print_eeprom(void)
     print_status(sensor_data.status.telnet_logger);
     Serial.print("\r\nHostname: ");
     Serial.print((char *)sensor_data.hostname);
+    Serial.print("\r\nNMEA Talker: ");
+    Serial.print((char *)sensor_data.nmea_talker);
     Serial.print("\r\nServer Port: ");
     Serial.print(sensor_data.server_port);
     Serial.print("\r\nColorize Prettyprint: ");
@@ -112,6 +114,7 @@ void commit_eeprom(void)
             q[i] = p[i];
         }        
     EEPROM.commit();
+    print_eeprom();
 }
 
 void erase_eeprom(void)

@@ -91,15 +91,16 @@ typedef enum
 #define LOGPORT_DATARATE            115200
 
 #define NMEA_SERVER_DEFAULT_PORT    3030
+#define NMEA_DEFAULT_TALKER         "LR"
 
 struct __status
 {
-    volatile uint32_t serial_logger        : 1;
-    volatile uint32_t telnet_logger        : 1;
-    volatile uint32_t slogger_baudrate     : 3;
-    volatile uint32_t colorize_prettyprint : 1;
-    volatile uint32_t activity_led         : 1;
-             uint32_t                      : 25;
+    volatile uint32_t serial_logger         : 1;
+    volatile uint32_t telnet_logger         : 1;
+    volatile uint32_t slogger_baudrate      : 3;
+    volatile uint32_t colorize_prettyprint  : 1;
+    volatile uint32_t activity_led          : 1;
+             uint32_t                       : 25;
 };
 typedef struct __status status_t;
 
@@ -118,8 +119,9 @@ struct __sensor_data
     volatile status_t status;
     volatile uint32_t server_port;
     volatile uint8_t hostname[32];
+    volatile uint8_t nmea_talker[3];
     wind_data_t wind_data;
-    volatile uint8_t reserved[8];
+    volatile uint8_t reserved[9];
     volatile uint32_t magic_number;
 };
 typedef struct __sensor_data sensor_data_t;
@@ -129,15 +131,15 @@ extern sensor_data_t sensor_data, sensor_data_mem;
 #define MAGIC_NUMBER                0xABBACAFE
 #define DEFAULT_HOSTNAME            "wind"
 
-#define WIND_ANGLE_FILTER_TAPS  16
+#define WIND_ANGLE_FILTER_TAPS      16
 extern unsigned int wind_angle_history[WIND_ANGLE_FILTER_TAPS];
 extern unsigned int last_wind_angle;
 
-#define WIND_SPEED_FILTER_TAPS  16
+#define WIND_SPEED_FILTER_TAPS      16
 extern unsigned int wind_speed_history[WIND_SPEED_FILTER_TAPS];
 extern unsigned int last_wind_speed;
 
-#define ACTIVITY_LED            12  
+#define ACTIVITY_LED                12  
 
 extern const int baudrates[];
 void print_attribute(text_attribute_t);
