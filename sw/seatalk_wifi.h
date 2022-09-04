@@ -139,7 +139,7 @@ extern unsigned int last_wind_angle;
 extern unsigned int wind_speed_history[WIND_SPEED_FILTER_TAPS];
 extern unsigned int last_wind_speed;
 
-#define ACTIVITY_LED                12  
+#define ACTIVITY_LED                12
 
 extern const int baudrates[];
 void print_attribute(text_attribute_t);

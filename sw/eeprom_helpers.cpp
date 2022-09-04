@@ -114,7 +114,6 @@ void commit_eeprom(void)
             q[i] = p[i];
         }        
     EEPROM.commit();
-    print_eeprom();
 }
 
 void erase_eeprom(void)

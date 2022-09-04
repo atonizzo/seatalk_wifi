@@ -1,4 +1,4 @@
-#SEATALK_WIFI
+# <p align=center>SEATALK_WIFI</p>
 
 ---
 ### Table of contents
@@ -32,9 +32,9 @@ client. This connection can be directly used with chart plotters such as
 The advantages of this solution are:
 
 - Allows older instrumentation using SeaTalk1 to be connected to newer
-chartplotters using NMEA via WiFI
-- The WiFi link allows the instrumentatio to be installed in out-of-the-way
-location thus freeing space in the navigation area
+chartplotters receiving NMEA sentences via WiFI
+- The WiFi link allows the instrumentation to be installed in
+out-of-the-way location thus freeing space in the navigation area
 - The board can be installed very close to the data source and does not
 require laying out data cables to a chart plotter. All that is needed
 is a 12 Volt connection to the battery
@@ -151,7 +151,7 @@ is Lennart Henning's ESPTelnet library which is used for the
 both the Telnet server and the NMEA server.
 
 ## <a name="web_page"></a> Configuration via Web Page
-The software runs a very simple web server that serves a single web page used
+The software runs a web server that serves a single web page used
 to configure a few parameters of the bridge. Among other things the page allows
 enabling or disabling of the serial and telnet logging windows and the port
 at which the NMEA server is listening. During the first start the software
@@ -257,7 +257,7 @@ violation (this is required by the way errors are handled in the serial library
 of the ESP8266 device), but when sending data the parity bit has to be handled
 as a 9th bit independent of the others which makes it impossible to use the
 hardware serial port TX pin to do this. When configured to use serial parity
-the ESP12 core sets parity based on the bit pattern to send and does not allow
+the ESP8266 core sets parity based on the bit pattern to send and does not allow
 independently setting the value of the parity bit. For this reason the SeaTalk
 TX line is connected to a GPIO in the expectation that a the TX signal can be
 bit-banged out of it.
@@ -271,8 +271,9 @@ with the data transmitted to detect collisions.
 # <a name="st40_holder"></a> Holder for ST40 devices
 With the NMEA data now sent via WiFI the ST40 device can optionally be
 installed in a more secluded place, clearing up some space in the navigation
-station. A 3D printed mount allows hiding the PCB behind the instrument and
-holding the instrument in place with an M3x8 pinch screw.
+station. A 3D printed mount allows installing the bridge PCB behind the
+instrument itself and holding the instrument in place with an M3x8
+pinch cap screw.
 
 Original FreeCAD file and STEP files are provided in the ```holder```
 directory.
