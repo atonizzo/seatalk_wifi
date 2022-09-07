@@ -49,7 +49,7 @@ connection needed for the system to work is a 12V from the boat
 electrical panel.
 
 The hardware board is not fused. It is expected that a 0.5A fast acting fuse
-be provided on the 12V supply line going to the circuit. The 12V wire
+be provided on the 12V supply line immediately before the circuit. The 12V wire
 that powers the circuit should also be fused at the distribution panel
 or go through an appropriately sized resettable circuit breaker.
 
