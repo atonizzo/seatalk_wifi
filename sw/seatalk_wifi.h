@@ -100,7 +100,8 @@ struct __status
     volatile uint32_t slogger_baudrate      : 3;
     volatile uint32_t colorize_prettyprint  : 1;
     volatile uint32_t activity_led          : 1;
-             uint32_t                       : 25;
+    volatile uint32_t wifi_power            : 8;
+             uint32_t                       : 17;
 };
 typedef struct __status status_t;
 
@@ -143,11 +144,8 @@ extern unsigned int last_wind_speed;
 
 extern const int baudrates[];
 void print_attribute(text_attribute_t);
+unsigned long float_to_str(char *, float, int);
 
 extern const char homepage[];
-
-void commit_eeprom(void);
-void dump_eeprom(void);
-void print_eeprom(void);
 
 #endif

@@ -70,9 +70,15 @@ void print_status(int st)
 
 void print_eeprom(void)
 {
-    Serial.print("EEPROM Contents");
+    char str[32];
+    Serial.print("\r\n\r\nEEPROM Contents");
     Serial.print("\r\n-----------------------------------------");
-    Serial.print("\r\nSerial Logger: ");
+    Serial.print("\r\nWifi Power: ");
+    str[0] = '\0';
+    float_to_str(str, 0.5 * sensor_data.status.wifi_power, 1);
+    Serial.print(str);
+    Serial.println("dBm");
+    Serial.print("Serial Logger: ");
     print_status(sensor_data.status.serial_logger);
     Serial.print("\r\nBaud Rate: ");
     Serial.print(baudrates[sensor_data.status.slogger_baudrate]);

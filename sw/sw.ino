@@ -19,6 +19,7 @@
 // https://github.com/LennartHennigs/ESPTelnet
 #include "ESPTelnet.h"   
 #include "seatalk_wifi.h"
+#include "eeprom_helpers.h"
 
 sensor_data_t sensor_data, sensor_data_mem;
 
@@ -311,12 +312,16 @@ void handler_push_settings(void)
     strncat((char *)sensor_data.hostname,
             http_server.arg("hostname").c_str(),
             31);        
-    value = http_server.arg("colorize");
-    sensor_data.status.colorize_prettyprint = value.toInt();
+    sensor_data.status.colorize_prettyprint = http_server.arg("colorize").toInt();
     sensor_data.status.activity_led = http_server.arg("led").toInt();
     sensor_data.nmea_talker[0] = toupper(http_server.arg("nmea_talker").c_str()[0]);
     sensor_data.nmea_talker[1] = toupper(http_server.arg("nmea_talker").c_str()[1]);
     sensor_data.nmea_talker[3] = '\0';
+    if (http_server.arg("wifi_power").toInt() != sensor_data.status.wifi_power)
+    {
+        sensor_data.status.wifi_power = http_server.arg("wifi_power").toInt();
+        WiFi.setOutputPower(0.5 * sensor_data.status.wifi_power);
+    }
     http_server.send(200, "text/plain", "\r\n");
     commit_eeprom();
 }
@@ -338,12 +343,12 @@ void handler_push_wind_settings(void)
 
 void handler_pull_settings(void)
 {
-    char s[128];
+    char s[256];
     sprintf(s,
             "ipaddr=%s&slogger=%d&tlogger=%d&"
             "slogger_baudrate=%d&server_port=%d&"
             "hostname=%s&colorize=%d&led=%d&"
-            "nmea_talker=%s",
+            "nmea_talker=%s&wifi_power=%d",
             WiFi.localIP().toString().c_str(),
             sensor_data.status.serial_logger,
             sensor_data.status.telnet_logger,
@@ -352,7 +357,8 @@ void handler_pull_settings(void)
             sensor_data.hostname,
             sensor_data.status.colorize_prettyprint,
             sensor_data.status.activity_led,
-            sensor_data.nmea_talker);
+            sensor_data.nmea_talker,
+            sensor_data.status.wifi_power);
     http_server.send(200, "text/plain", s);
 }
 
@@ -487,6 +493,7 @@ void setup()
         sensor_data.status.slogger_baudrate = 4;
         sensor_data.status.colorize_prettyprint = 0;
         sensor_data.status.activity_led = 1;
+        sensor_data.status.wifi_power = 41;
         sensor_data.server_port = NMEA_SERVER_DEFAULT_PORT;
         sensor_data.hostname[0] = '\0';
         strncat((char *)sensor_data.hostname, DEFAULT_HOSTNAME, 31);        
@@ -514,15 +521,19 @@ void setup()
     WiFi.mode(WIFI_STA);
     WiFi.hostname((char *)sensor_data.hostname);
     WiFi.begin(WIFI_SSID, WIFI_PASS);
+    Serial.print(" ");
     while (WiFi.status() != WL_CONNECTED)
     {
         delay(1000);
         seconds += 1;
         if (seconds == 15)
             break;
+        if (seconds > 10)    
+            Serial.print("\b");
+        Serial.print("\b");
         Serial.print(seconds);
-        Serial.print(" ");
     }
+    WiFi.setOutputPower((1.0 * sensor_data.status.wifi_power) / 2);
 
     Serial.print("\r\n");
     if (WiFi.status() == WL_CONNECTED)

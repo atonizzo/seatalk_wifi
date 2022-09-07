@@ -48,8 +48,10 @@ board supplies 12V to power the target instrument so that the only
 connection needed for the system to work is a 12V from the boat
 electrical panel.
 
-The circuit is not fused and it is expected that a 1A fused be provided
-during the installation.
+The hardware board is not fused. It is expected that a 0.5A fast acting fuse
+be provided on the 12V supply line going to the circuit. The 12V wire
+that powers the circuit should also be fused at the distribution panel
+or go through an appropriately sized resettable circuit breaker.
 
 ## <a name="schematic"></a> Schematic 
 ![Seatalk_wifi Schematic](pictures/seatalk_wifi.svg)
@@ -153,7 +155,8 @@ both the Telnet server and the NMEA server.
 ## <a name="web_page"></a> Configuration via Web Page
 The software runs a web server that serves a single web page used
 to configure a few parameters of the bridge. Among other things the page allows
-enabling or disabling of the serial and telnet logging windows and the port
+setting the output power for the WiFi transmitter, enabling or disabling
+of the serial and telnet logging windows and the port
 at which the NMEA server is listening. During the first start the software
 creates a configuration space in EEPROM and stores a few default parameters.
 The defaults have been chosen to aid in the debgging of the board during firts
@@ -180,7 +183,7 @@ The web page also lists the SeaTalk sentences that are supported by the bridge.
 In gusty wind conditions the wind angle -and to a lesser extent the speed- returned
 by the wind instrument are subject to very quick jumps only to then return to
 prevailing conditions. To filter out some of the noise introduced by these
-jumps the angle and speed data can be independently filtered by a simple
+jumps the angle and speed data can be independently processed by a simple
 moving average filter. Whether these filters are enabled and their lenght
 can be configured from the web page in the fieldset specific to the wind
 instrument.

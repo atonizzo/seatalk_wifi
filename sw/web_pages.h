@@ -40,6 +40,8 @@ const char homepage[] = R"=====(
     document.getElementsByName("nmea_talker")[0].value = urlParams.get('nmea_talker').substr(0, 2);
     document.getElementsByName("colorize")[0].checked = (parseInt(urlParams.get('colorize'), 10) == 1);
     document.getElementsByName("led")[0].checked = (parseInt(urlParams.get('led'), 10) == 1);
+    document.getElementsByName("wifi_power")[0].valueAsNumber = parseInt(urlParams.get('wifi_power'), 10);
+    document.getElementsByName("slider_wifi_power")[0].innerHTML = "" + ((1.0 * parseInt(urlParams.get('wifi_power'), 10)) / 2) + "dBm"
   }
   function pull_wind_settings(xhttp) {
     const urlParams = new URLSearchParams(xhttp.responseText);
@@ -52,7 +54,7 @@ const char homepage[] = R"=====(
     document.getElementsByName("angle_slider")[0].valueAsNumber = parseInt(urlParams.get('filter_angle_len'), 10);
     document.getElementsByName("speed_slider")[0].valueAsNumber = parseInt(urlParams.get('filter_speed_len'), 10);
     document.getElementsByName("slider_angle_len")[0].innerHTML = "" + parseInt(urlParams.get('filter_angle_len'), 10)
-    document.getElementsByName("slider_speed_len")[0].innerHTML = "" + parseInt(urlParams.get('filter_speed_len'), 10)
+    
   }
   function push_settings()
   {
@@ -72,6 +74,7 @@ const char homepage[] = R"=====(
     url += (document.getElementsByName("colorize")[0].checked == true) ? 1 : 0
     url += "&led="
     url += (document.getElementsByName("led")[0].checked == true) ? 1 : 0
+    url += "&wifi_power=" + document.getElementsByName("wifi_power")[0].valueAsNumber
     const xhttp=new XMLHttpRequest();
     xhttp.onload = function() {post_update(this);}
     xhttp.open("GET", url);
@@ -100,13 +103,18 @@ const char homepage[] = R"=====(
       document.getElementsByName("slider_speed_len")[0].innerHTML =
         "" + document.getElementsByName("speed_slider")[0].valueAsNumber;
   }
+  function oninput_wifi_slider() {
+      document.getElementsByName("slider_wifi_power")[0].innerHTML =
+        "" + (1.0 * document.getElementsByName("wifi_power")[0].valueAsNumber / 2) + "dBm";
+  }
 </script>
 </head>
 <body onload="load_body()">
 <fieldset>
 <legend>Raymarine Seatalk Instrument Settings</legend>
 <table>
-<tr><th>Type</th><th>Value</th></tr>
+<tr><td>WiFi Power</td><td><input type="range" min="0" max="41" value="10" class="slider" name="wifi_power" onchange="push_settings()" oninput="oninput_wifi_slider()"></td>
+<td><label name="slider_wifi_power">0</label><td></tr>
 <tr><td>Local IP Address</td><td><label name="ipaddr">0.0.0.0</label></td></tr>
 <tr><td>Serial Logger</td><td><input type="checkbox" name="slogger" onclick="pull_settings()"></td></tr>
 <tr>
@@ -135,7 +143,6 @@ const char homepage[] = R"=====(
 <fieldset>
 <legend>Wind Instrument Settings</legend>
 <table>
-<tr><th>Type</th><th>Value</th></tr>
 <tr><td>Angle Filter Enable</td><td><input type="checkbox" name="filter_angle_enable" onclick="push_wind_settings()"></td></tr>
 <tr><td>Angle Filter Lenght</td><td><input type="range" min="1" max="16" value="10" class="slider" name="angle_slider" onchange="push_wind_settings()" oninput="oninput_angle_slider()"></td>
 <td><label name="slider_angle_len">0</label><td></tr>
@@ -157,4 +164,5 @@ const char homepage[] = R"=====(
 </fieldset>
 </body>
 </html>
+
 )=====";
