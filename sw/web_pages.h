@@ -54,7 +54,7 @@ const char homepage[] = R"=====(
     document.getElementsByName("angle_slider")[0].valueAsNumber = parseInt(urlParams.get('filter_angle_len'), 10);
     document.getElementsByName("speed_slider")[0].valueAsNumber = parseInt(urlParams.get('filter_speed_len'), 10);
     document.getElementsByName("slider_angle_len")[0].innerHTML = "" + parseInt(urlParams.get('filter_angle_len'), 10)
-    
+    document.getElementsByName("slider_speed_len")[0].innerHTML = "" + parseInt(urlParams.get('filter_speed_len'), 10)
   }
   function push_settings()
   {
@@ -131,7 +131,7 @@ const char homepage[] = R"=====(
 <tr><td>Hostname</td><td><input type="text" name="hostname" required
        minlength="3" maxlength="31" size="10"></td>
        <td><button type="button" onclick="push_settings()">Update</button></td></tr>
-<td>NMEA Port</td><td><input type="number" name="server_port" ></input></td>
+<td>NMEA Port</td><td><input type="number" max="1" max="65535" name="server_port" ></input></td>
 <td><button type="button" onclick="push_settings()">Update</button></td></tr>
 <tr><td>NMEA Talker</td><td><input type="text" name="nmea_talker" required
        minlength="2" maxlength="2" size="10"></td>
