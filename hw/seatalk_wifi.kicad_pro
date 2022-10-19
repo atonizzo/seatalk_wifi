@@ -63,6 +63,7 @@
       "rule_severities": {
         "annular_width": "error",
         "clearance": "error",
+        "connection_width": "ignore",
         "copper_edge_clearance": "error",
         "copper_sliver": "warning",
         "courtyards_overlap": "error",
@@ -71,6 +72,7 @@
         "drill_out_of_range": "error",
         "duplicate_footprints": "warning",
         "extra_footprint": "warning",
+        "footprint": "error",
         "footprint_type_mismatch": "error",
         "hole_clearance": "error",
         "hole_near_hole": "error",
@@ -116,6 +118,7 @@
         "allow_microvias": false,
         "max_error": 0.005,
         "min_clearance": 0.0,
+        "min_connection": 0.0,
         "min_copper_edge_clearance": 0.024999999999999998,
         "min_hole_clearance": 0.0,
         "min_hole_to_hole": 0.25,
@@ -475,7 +478,6 @@
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
         "name": "Differential Pair",
-        "nets": [],
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 0.32,
@@ -493,7 +495,6 @@
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
         "name": "Power",
-        "nets": [],
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 0.5,
@@ -503,9 +504,11 @@
       }
     ],
     "meta": {
-      "version": 2
+      "version": 3
     },
-    "net_colors": null
+    "net_colors": null,
+    "netclass_assignments": null,
+    "netclass_patterns": []
   },
   "pcbnew": {
     "last_paths": {

@@ -22,7 +22,7 @@
 5. [Contact](#contact)
 ---
 
-# <a name="introduction"></a> Introduction 
+# <a name="introduction"></a> Introduction
 The hardware and the included software of this project create a
 bridge between a Raymarine SeaTalk1 instrument and NMEA. The NMEA
 sentences generated are sent via a WiFi connection to a remote
@@ -39,21 +39,21 @@ out-of-the-way location thus freeing space in the navigation area
 require laying out data cables to a chart plotter. All that is needed
 is a 12 Volt connection to the battery
 
-# <a name="hardware"></a> Hardware 
+# <a name="hardware"></a> Hardware
 The hardware is a simple board with pads designed to connect to to a 12V
 source on one side (typically a switched and fused boat battery) and to
-a Seatalk connector on the other 
+a Seatalk connector on the other
 (see <a href="### PCB Layout">PCB layout pictures</a>). The
 board supplies 12V to power the target instrument so that the only
-connection needed for the system to work is a 12V from the boat
+connection needed for the system to work is a single 12V feed from the boat
 electrical panel.
 
-The hardware board is not fused. It is expected that a 0.5A fast acting fuse
-be provided on the 12V supply line immediately before the circuit. The 12V wire
+The hardware board is not fused. It is expected that a 0.1A fast acting fuse
+be provided on the 12V supply line immediately before the circuit. The 12V feed
 that powers the circuit should also be fused at the distribution panel
 or go through an appropriately sized resettable circuit breaker.
 
-## <a name="schematic"></a> Schematic 
+## <a name="schematic"></a> Schematic
 ![Seatalk_wifi Schematic](pictures/seatalk_wifi.svg)
 
 During the development of the circuit it was noticed that the Raymarine
@@ -61,28 +61,30 @@ instrument being used (an ST40 wind instrument) was very sensitive about
 loading of the SeaTalk serial line. To isolate the SeaTalk data line from
 the rest of the circuitry Q2 acts as a buffer.
 
+Q2 also inverts the polarity of the signal. The polarity is once again inverted
+by the receiver integrated into U3, which also provides voltage translation
+down to 3.3V.
+
 U1 implements a regulator rated to least 2A. An earlier version of this board
 designed with a linear regulator showed that the regulator tended to overheat,
 which prompted a redesign using a switching topology.
 
-###  <a name="serial_bridge"></a> Serial Bridge   
-R12 allows the board to be used as a receive-only serial to WIFI bridge. In 
+###  <a name="serial_bridge"></a> Serial Bridge
+R12 allows the board to be used as a receive-only serial to WIFI bridge. In
 order to use this feature, the changes to the schematic are:
 
 | Remove | Install |
 | :---:  | :---:   |
-| Q1     | R12     |
-| Q2     |         |
-| R9     |         | 
+| Q1, Q2, R9    | R12     |
 
-Now the center pad can be connected to a TX pin of the RS232 port of a
+Now the center pad can be connected to the TX pin of the RS232 port of a
 NMEA device and the serial stream of NMEA sentences can be sent out to
 WIFI.
 
-## <a name="pcb_layout"></a> PCB Layout 
+## <a name="pcb_layout"></a> PCB Layout
 
 The board has been designed using KiCad and the fabrication files are provided
-in the fab/ directory.
+in the ```fab``` directory.
 
 Board dimensions are 31 mm x 22 mm.
 
@@ -92,7 +94,7 @@ Board dimensions are 31 mm x 22 mm.
 On the right side of the board the pads, from top to bottom, are:
 
 - GND
-- 12V (unfused, use a 1A fuse)
+- 12V (unfused, use a 500mA inline fuse)
 
 These pads are connected to the boat battery. A better installation
 would require powering this board from the same switched connection
@@ -107,28 +109,28 @@ in the list. From top to bottom:
 | :---:       | :---:              |
 | GND         | black or bare wire |
 | SeaTalk     | yellow             |
-| +12V        |  red               | 
+| +12V        |  red               |
 
 On the top side of the board the pads, from left to right, are:
 
 - Serial Logger (unmarked on the PCB) This pin is connected to the TX pin
 of serial port 2 of the ESP12 and -if enabled by the user- emits a
-pretty print of all the commands handled by the hardware 
+pretty print of all the commands handled by the hardware
 (see <a href="### Serial Logger">Serial Logger</a>).
 
 - Programming cable RX line (marked with R in the layout). This is connected
 to the RX pin of serial port 1 of the ESP12 and is primarily used to program
-the device. Serial port 1 is used for both programming the board as
-well as to receive the SeaTalk sentences from the instrument. During
-development this means that this pin must be disconnected from the
-programming cable before resetting the board to to prevent interference between
+the device. Serial port 1 of the ESP12 device is used for both programming
+the board as well as to receive the SeaTalk sentences from the instrument.
+During development this means that this pin must be disconnected from the
+programming cable before resetting the board to prevent interference between
 the programmer hardware and the SeaTalk instrument. Failure to disconnect
 this cable during regular use will prevent the SeaTalk sentences from
 being received by the MCU
 
 - Programming cable TX line (marked with T in the layout) is connected to the
-TX pin of the ESP12 and is only used during programming. It can also be
-used to output debug information during debug but the terminal must be
+TX pin of the ESP12 and is mainly used during programming. It can also be
+used to output general purpose debug information but the terminal must be
 programmed with the same serial parameters used by SeaTalk, which are
 usually 4800 bauds, 8 bits, Even parity, 1 Stop bit.
 
@@ -184,8 +186,8 @@ In gusty wind conditions the wind angle -and to a lesser extent the speed- retur
 by the wind instrument are subject to very quick jumps only to then return to
 prevailing conditions. To filter out some of the noise introduced by these
 jumps the angle and speed data can be independently processed by a simple
-moving average filter. Whether these filters are enabled and their lenght
-can be configured from the web page in the fieldset specific to the wind
+moving average filter. When these filters are enabled their lenght
+can be configured using the web page in the fieldset specific to the wind
 instrument.
 
 ## <a name="serial_logger"></a> Serial Logger
@@ -241,10 +243,10 @@ The information output shows the content of the configuration EEPROM as well
 as the output from the connection to a WiFi network.
 
 # <a name="further_development"></a> Further Developmnent
-The board can be improved in a number of ways.
+The project can be improved in a number of ways.
 
 ## Handling Additional SeaTalk Sentences
-The only instrument available for development was an ST40 wind instrument and
+The only instrument available during development was an ST40 wind instrument and
 the messages that are emitted by that instrument are the only one currently
 recognized by the software. The software processes the Seatalk sentences using
 a state machine and it makes rather trivial job to add code that handles new
@@ -252,7 +254,7 @@ sentences.
 
 ## Adding the Ability to Transmit SeaTalk Sentences
 The current release does not allow transmitting of Seatalk sentences because
-there was no need for it in the only ST40 instrument used for development. 
+there was no need for it in the only ST40 instrument used for development.
 
 In receive mode, the parity bit is extracted using a technique that involves
 checking for RX errors and then assuming that any such error is due to parity
@@ -277,6 +279,10 @@ installed in a more secluded place, clearing up some space in the navigation
 station. A 3D printed mount allows installing the bridge PCB behind the
 instrument itself and holding the instrument in place with an M3x8
 pinch cap screw.
+
+The board is hidden underneath a lid, secured with 2 M2x6 screws, with
+power supply wires entering from the bottom and wires to the instrument
+coming out from the top.
 
 Original FreeCAD file and STEP files are provided in the ```holder```
 directory.

@@ -26,3 +26,7 @@ wifi_credentials.h
 # Exported BOM files
 *.xml
 *.csv
+
+# Freecad files
+holder/*.FCStd1
+holder/*.stl
