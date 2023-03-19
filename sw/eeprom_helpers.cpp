@@ -20,18 +20,22 @@ void dump_eeprom(void)
 {
     Serial.print("\r\n");
 
-    print_attribute(TEXT_ATTRIB_FG_BLUE);
+    if (sensor_data.status.colorize_prettyprint == 1)
+        print_attribute(TEXT_ATTRIB_FG_BLUE);
     Serial.print("     0 1 2 3 4 5 6 7 8 9"
                    " A B C D E F\r\n");
     Serial.print("     --------------------------------");
-    print_attribute(TEXT_ATTRIB_NORMAL);
+    if (sensor_data.status.colorize_prettyprint == 1)
+        print_attribute(TEXT_ATTRIB_NORMAL);
     for (int i = 0; i < EEPROM.length(); i += 16)
     {
         char s[16];
         sprintf(s, "\r\n%04X ", i);
-        print_attribute(TEXT_ATTRIB_FG_BLUE);
+        if (sensor_data.status.colorize_prettyprint == 1)
+            print_attribute(TEXT_ATTRIB_FG_BLUE);
         Serial.print(s);
-        print_attribute(TEXT_ATTRIB_NORMAL);
+        if (sensor_data.status.colorize_prettyprint == 1)
+            print_attribute(TEXT_ATTRIB_NORMAL);
         for (int j = 0; j < 16; j += sizeof(uint8_t))
         {
             sprintf(s, "%02X", EEPROM.read(i + j));
@@ -57,15 +61,18 @@ void print_status(int st)
 {
     if (st == 0)
     {
-        print_attribute(TEXT_ATTRIB_FG_RED);
+        if (sensor_data.status.colorize_prettyprint == 1)
+            print_attribute(TEXT_ATTRIB_FG_RED);
         Serial.print("Disabled");
     }
     else    
     {
-        print_attribute(TEXT_ATTRIB_FG_GREEN);
+        if (sensor_data.status.colorize_prettyprint == 1)
+            print_attribute(TEXT_ATTRIB_FG_GREEN);
         Serial.print("Enabled");
     }
-    print_attribute(TEXT_ATTRIB_NORMAL);
+    if (sensor_data.status.colorize_prettyprint == 1)
+        print_attribute(TEXT_ATTRIB_NORMAL);
 }
 
 void print_eeprom(void)
@@ -73,37 +80,42 @@ void print_eeprom(void)
     char str[32];
     Serial.print("\r\n\r\nEEPROM Contents");
     Serial.print("\r\n-----------------------------------------");
-    Serial.print("\r\nWifi Power: ");
     str[0] = '\0';
     float_to_str(str, 0.5 * sensor_data.status.wifi_power, 1);
-    Serial.print(str);
-    Serial.println("dBm");
-    Serial.print("Serial Logger: ");
+    Serial.printf("\r\nWifi Power: %s dBm", str);
+    Serial.print("\r\nSerial Logger: ");
     print_status(sensor_data.status.serial_logger);
-    Serial.print("\r\nBaud Rate: ");
-    Serial.print(baudrates[sensor_data.status.slogger_baudrate]);
+    Serial.printf("\r\nBaud Rate: %d",
+                  baudrates[sensor_data.status.slogger_baudrate]);
     Serial.print("\r\nTelnet Logger: ");
     print_status(sensor_data.status.telnet_logger);
-    Serial.print("\r\nHostname: ");
-    Serial.print((char *)sensor_data.hostname);
-    Serial.print("\r\nNMEA Talker: ");
-    Serial.print((char *)sensor_data.nmea_talker);
-    Serial.print("\r\nServer Port: ");
-    Serial.print(sensor_data.server_port);
+    Serial.printf("\r\nHostname: %s", (char *)sensor_data.hostname);
+    Serial.printf("\r\nNMEA Talker: %s", (char *)sensor_data.nmea_talker);
+    Serial.printf("\r\nNMEA Port: %d", sensor_data.nmea_port);
     Serial.print("\r\nColorize Prettyprint: ");
     print_status(sensor_data.status.colorize_prettyprint);
     Serial.print("\r\nActivity LED: ");
     print_status(sensor_data.status.activity_led);
+    Serial.printf("\r\nOTA Programming: ");
+    print_status(sensor_data.status.enable_ota);
     Serial.print("\r\n\r\n");
     Serial.print("Wind Instrument Device Specific Settings\r\n");
-    Serial.print("Filter Angle Enable: ");
+    Serial.print("Filter Angle: ");
     print_status(sensor_data.wind_data.filter_angle_enable);
-    Serial.print("\r\nFilter Speed Enable: ");
+    Serial.print("\r\nFilter Speed: ");
     print_status(sensor_data.wind_data.filter_speed_enable);
-    Serial.print("\r\nFilter Angle Length: ");
-    Serial.print(sensor_data.wind_data.angle_ma_length);
-    Serial.print("\r\nFilter Speed Length: ");
-    Serial.print(sensor_data.wind_data.speed_ma_length);
+    Serial.printf("\r\nFilter Angle Length: %d",
+                  sensor_data.wind_data.angle_ma_length);
+    Serial.printf("\r\nFilter Speed Length: %d",
+                  sensor_data.wind_data.speed_ma_length);
+    Serial.print("\r\nSignalK JSON: ");
+    print_status(sensor_data.status.signalk_udp_enable);
+    Serial.printf("\r\nSignalK Json IP: %d.%d.%d.%d",
+                  sensor_data.signalk_udp_ip[0],
+                  sensor_data.signalk_udp_ip[1],
+                  sensor_data.signalk_udp_ip[2],
+                  sensor_data.signalk_udp_ip[3]);
+    Serial.printf("\r\nSignalK JSON Port: %d", sensor_data.signalk_udp_port);
     Serial.print("\r\n-----------------------------------------");
     Serial.print("\r\n");
     Serial.print("\r\n");
@@ -120,6 +132,7 @@ void commit_eeprom(void)
             q[i] = p[i];
         }        
     EEPROM.commit();
+    print_eeprom();
 }
 
 void erase_eeprom(void)

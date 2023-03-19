@@ -1,30 +1,35 @@
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Author: Anthony Tonizzo - 2022
+// Author: Anthony Tonizzo - 2022-2023
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+// This sketch uses Benoit Blanchon's ArduinoJson library.
+// https://github.com/bblanchon/ArduinoJson
+#include <ArduinoJson.h>
+#include <ArduinoOTA.h>
+#include <WiFiUdp.h>
 #include <EEPROM.h>
-// This sketch uses Lennart Henning's ESPTelnet library.
+// This sketch uses Lennart Hennigs' ESPTelnet library.
 // https://github.com/LennartHennigs/ESPTelnet
-#include "ESPTelnet.h"   
+#include "ESPTelnet.h"
 #include "seatalk_wifi.h"
 #include "eeprom_helpers.h"
 
 sensor_data_t sensor_data, sensor_data_mem;
 
 #include "wifi_credentials.h"   // Define WIFI_SSID and WIFI_PASS here.
-#import "web_pages.h"
+#include "web_pages.h"
 
 char cmd_payload[16];   // Holds the payload of the SeaTalk sentence.
 char nmea_message[96];  // Maximum NMEA sentence length is 82 bytes.
@@ -40,10 +45,9 @@ unsigned int wind_speed_sum;
 
 // Text buffer for the serial and/or telnet loggers.
 char str_logger[256];
-
 unsigned long ms_timer;
 
-const int baudrates[] = 
+constexpr int baudrates[] =
 {
     // These values must match those in the SELECT tag in the
     //  HTML code.
@@ -55,7 +59,7 @@ const int baudrates[] =
 unsigned int table_item;
 unsigned int packet_bytes_received = 0;
 unsigned int cursor_position;
-float apparent_wind_angle = 0., apparent_wind_speed;
+float apparent_wind_angle = 0., apparent_wind_speed = 0;
 
 static struct __cmd seatalk_commands[] =
 {
@@ -63,10 +67,11 @@ static struct __cmd seatalk_commands[] =
     {SEATALK_APPARENT_WIND_SPEED, 4, "APPARENT_WIND_SPEED"},
     {SEATALK_LAMP_INTENSITY,      3, "LAMP_INTENSITY"},
     // Add new entries to this table above this line.
-    {SEATALK_UNSUPPORTED,         0, "UNSUPPORTED"}, 
+    {SEATALK_UNSUPPORTED,         0, "UNSUPPORTED"},
 };
 
 ESP8266WebServer http_server(80);
+WiFiUDP udp;
 
 // This is the server that pushes the NMEA 0183 sentances to
 //  requesting clients.
@@ -76,6 +81,9 @@ bool nmea_server_sec_connected = false;
 
 ESPTelnet telnet_logger;
 bool telnet_logger_connected = false;
+
+const char* sk_key_wind_angle = "environment/wind/angleApparent";
+const char* sk_key_wind_speed = "environment/wind/speedApparent";
 
 static void telnet_logger_connect(String ip)
 {
@@ -145,7 +153,7 @@ unsigned long float_to_str(char *p, float num, int precision)
         sprintf(p + strlen(p), "-");
         character_count = 1;
         num = -num;
-    }    
+    }
 
     // Round the float number to the precision requested.
     precision = min(10, precision);
@@ -204,12 +212,7 @@ void append_text_attribute(char *p, text_attribute_t c)
 void print_attribute(text_attribute_t c)
 {
     if (sensor_data.status.colorize_prettyprint == 1)
-    {
-        char p[8];
-        p[0] = '\0';
-        append_text_attribute(p, c);
-        Serial.print(p);
-    }
+        Serial.printf("\e[%dm", c);
 }
 
 // From Hacker's Delight.
@@ -274,6 +277,7 @@ static void prettyprint_command(char *p, unsigned int cursor_position)
 }
 
 static void print_slogger_banner(void)
+
 {
     Serial1.print("\r\nTimestamp  Raw Data");
     cursor_position = strlen("Timestamp  Raw Data");
@@ -288,10 +292,14 @@ static void print_slogger_banner(void)
                    "------------------------------------\r\n");
 }
 
-void handleRoot()
+void handler_homepage()
 {
-    String hp(homepage);
-    http_server.send(200, "text/html", hp.c_str());
+    http_server.send(200, "text/html", homepage);
+}
+
+void handler_gauges()
+{
+    http_server.send(200, "text/html", gauges);
 }
 
 void handler_push_settings(void)
@@ -305,15 +313,15 @@ void handler_push_settings(void)
     sensor_data.status.telnet_logger = value.toInt();
     value = http_server.arg("slogger_baud");
     sensor_data.status.slogger_baudrate = value.toInt();
-    if (http_server.arg("server_port").toInt() < 65536)
-        sensor_data.server_port =
-                        http_server.arg("server_port").toInt();
+    if (http_server.arg("nmea_port").toInt() < 65536)
+        sensor_data.nmea_port = http_server.arg("nmea_port").toInt();
     sensor_data.hostname[0] = '\0';
     strncat((char *)sensor_data.hostname,
             http_server.arg("hostname").c_str(),
-            31);        
+            31);
     sensor_data.status.colorize_prettyprint = http_server.arg("colorize").toInt();
     sensor_data.status.activity_led = http_server.arg("led").toInt();
+    sensor_data.status.enable_ota = http_server.arg("ota").toInt();
     sensor_data.nmea_talker[0] = toupper(http_server.arg("nmea_talker").c_str()[0]);
     sensor_data.nmea_talker[1] = toupper(http_server.arg("nmea_talker").c_str()[1]);
     sensor_data.nmea_talker[3] = '\0';
@@ -341,24 +349,46 @@ void handler_push_wind_settings(void)
     reset_wind_data();
 }
 
+void handler_push_signalk_settings(void)
+{
+    String value = http_server.arg("signalk_udp_enable");
+    sensor_data.status.signalk_udp_enable = value.toInt();
+    value = http_server.arg("signalk_udp_ip_0");
+    sensor_data.signalk_udp_ip[0] = value.toInt();
+    value = http_server.arg("signalk_udp_ip_1");
+    sensor_data.signalk_udp_ip[1] = value.toInt();
+    value = http_server.arg("signalk_udp_ip_2");
+    sensor_data.signalk_udp_ip[2] = value.toInt();
+    value = http_server.arg("signalk_udp_ip_3");
+    sensor_data.signalk_udp_ip[3] = value.toInt();
+    value = http_server.arg("signalk_udp_port");
+    sensor_data.signalk_udp_port = value.toInt();
+    http_server.send(200, "text/plain", "\r\n");
+    commit_eeprom();
+    reset_wind_data();
+}
+
 void handler_pull_settings(void)
 {
     char s[256];
     sprintf(s,
             "ipaddr=%s&slogger=%d&tlogger=%d&"
-            "slogger_baudrate=%d&server_port=%d&"
+            "slogger_baudrate=%d&nmea_port=%d&"
             "hostname=%s&colorize=%d&led=%d&"
-            "nmea_talker=%s&wifi_power=%d",
+            "nmea_talker=%s&wifi_power=%d&ota=%d&"
+            "fw_version=%s",
             WiFi.localIP().toString().c_str(),
             sensor_data.status.serial_logger,
             sensor_data.status.telnet_logger,
             sensor_data.status.slogger_baudrate,
-            sensor_data.server_port,
+            sensor_data.nmea_port,
             sensor_data.hostname,
             sensor_data.status.colorize_prettyprint,
             sensor_data.status.activity_led,
             sensor_data.nmea_talker,
-            sensor_data.status.wifi_power);
+            sensor_data.status.wifi_power,
+            sensor_data.status.enable_ota,
+            FIRMWARE_VERSION);
     http_server.send(200, "text/plain", s);
 }
 
@@ -378,6 +408,32 @@ void handler_pull_wind_settings(void)
     http_server.send(200, "text/plain", s);
 }
 
+void handler_pull_signalk_settings(void)
+{
+    char s[256];
+    sprintf(s,
+            "signalk_udp_enable=%d&signalk_udp_ip_0=%d"
+            "&signalk_udp_ip_1=%d&signalk_udp_ip_2=%d"
+            "&signalk_udp_ip_3=%d&signalk_udp_port=%d",
+            sensor_data.status.signalk_udp_enable,
+            sensor_data.signalk_udp_ip[0],
+            sensor_data.signalk_udp_ip[1],
+            sensor_data.signalk_udp_ip[2],
+            sensor_data.signalk_udp_ip[3],
+            sensor_data.signalk_udp_port);
+    http_server.send(200, "text/plain", s);
+}
+
+void handler_pull_wind_data(void)
+{
+    char s[64];
+    sprintf(s, "wind_speed=");
+    float_to_str(s + strlen(s), apparent_wind_speed, 1);
+    strcat(s, "&wind_angle=");
+    float_to_str(s + strlen(s), apparent_wind_angle, 1);
+    http_server.send(200, "text/plain", s);
+}
+
 void handler_page_not_found(void)
 {
     http_server.send(404, "text/plain", "404: Not found");
@@ -394,7 +450,7 @@ void sendout_strlogger(void)
             telnet_logger.print(str_logger);
 }
 
-unsigned int print_error_header(char *p)
+unsigned int print_error_header(const char *p)
 {
     // Packet is compromised.
     str_logger[0] = '\0';
@@ -444,10 +500,10 @@ void print_parity_error(void)
 
 float ma_wind_angle(unsigned int angle_measurement)
 {
-    last_wind_angle = 
+    last_wind_angle =
       (last_wind_angle == sensor_data.wind_data.angle_ma_length - 1) ?
          0 : last_wind_angle + 1;
-    wind_angle_sum += angle_measurement - 
+    wind_angle_sum += angle_measurement -
                             wind_angle_history[last_wind_angle];
     wind_angle_history[last_wind_angle] = angle_measurement;
 
@@ -457,15 +513,57 @@ float ma_wind_angle(unsigned int angle_measurement)
 
 float ma_wind_speed(unsigned int speed_measurement)
 {
-    last_wind_speed = 
+    last_wind_speed =
        (last_wind_speed == sensor_data.wind_data.speed_ma_length - 1) ?
         0 : last_wind_speed + 1;
-    wind_speed_sum += speed_measurement - 
+    wind_speed_sum += speed_measurement -
                             wind_speed_history[last_wind_speed];
     wind_speed_history[last_wind_speed] = speed_measurement;
 
     // Simple moving average.
     return 1.0 * wind_speed_sum / sensor_data.wind_data.speed_ma_length;
+}
+
+static void send_nmea_data(float apparent_wind_angle,
+                           float apparent_wind_speed)
+{
+    // Speed is always in knots.
+    sprintf(nmea_message,
+            "$%sMWV,%3.1f,R,%2.1f,N,A*",
+            sensor_data.nmea_talker,
+            apparent_wind_angle,
+            apparent_wind_speed);
+    sprintf(nmea_message + strlen(nmea_message),
+            "%02X\r\n",
+            nmea_compute_checksum(nmea_message));
+    if (nmea_server_pri_connected == true)
+        nmea_server_pri.print(nmea_message);
+    if (nmea_server_sec_connected == true)
+        nmea_server_sec.print(nmea_message);
+}
+
+static void send_sk_data(String key, float data)
+{
+    DynamicJsonDocument jsonBuffer(512);
+    JsonArray updatesArr = jsonBuffer.createNestedArray("updates");
+    JsonObject thisUpdate = updatesArr.createNestedObject();
+    JsonArray values = thisUpdate.createNestedArray("values");
+    JsonObject thisValue = values.createNestedObject();
+    thisValue["path"] = key;
+    thisValue["value"] = data;
+    thisUpdate["Source"] = DEFAULT_SIGNALK_SOURCE;
+
+    // Send UDP packet
+    udp.beginPacket(IPAddress(sensor_data.signalk_udp_ip[0],
+                              sensor_data.signalk_udp_ip[1],
+                              sensor_data.signalk_udp_ip[2],
+                              sensor_data.signalk_udp_ip[3]),
+                              sensor_data.signalk_udp_port);
+    serializeJson(jsonBuffer, udp);
+    udp.println();
+    udp.endPacket();
+    serializeJson(jsonBuffer, Serial);
+    Serial.println();
 }
 
 void setup()
@@ -493,15 +591,17 @@ void setup()
         sensor_data.status.slogger_baudrate = 4;
         sensor_data.status.colorize_prettyprint = 0;
         sensor_data.status.activity_led = 1;
+        sensor_data.status.enable_ota = 1;
         sensor_data.status.wifi_power = 41;
-        sensor_data.server_port = NMEA_SERVER_DEFAULT_PORT;
+        sensor_data.nmea_port = NMEA_SERVER_DEFAULT_PORT;
         sensor_data.hostname[0] = '\0';
-        strncat((char *)sensor_data.hostname, DEFAULT_HOSTNAME, 31);        
-        strncpy((char *)sensor_data.nmea_talker, NMEA_DEFAULT_TALKER, 2);        
+        strncat((char *)sensor_data.hostname, DEFAULT_HOSTNAME, 31);
+        strncpy((char *)sensor_data.nmea_talker, NMEA_DEFAULT_TALKER, 2);
         sensor_data.wind_data.filter_angle_enable = 1;
         sensor_data.wind_data.filter_speed_enable = 1;
         sensor_data.wind_data.angle_ma_length = 10;
         sensor_data.wind_data.speed_ma_length = 6;
+
         sensor_data.magic_number = MAGIC_NUMBER;
         commit_eeprom();
     }
@@ -510,10 +610,8 @@ void setup()
     Serial1.begin(baudrates[sensor_data.status.slogger_baudrate]);
     while (!Serial1);
 
-    Serial.print("\e[2J\r\n");    
-    Serial1.print("\e[2J\r\n");    
-    dump_eeprom();
-    print_eeprom();
+    Serial.print("\e[2J\r\n");
+    Serial1.print("\e[2J\r\n");
 
     int seconds = 0;
 
@@ -528,7 +626,7 @@ void setup()
         seconds += 1;
         if (seconds == 15)
             break;
-        if (seconds > 10)    
+        if (seconds > 10)
             Serial.print("\b");
         Serial.print("\b");
         Serial.print(seconds);
@@ -549,13 +647,12 @@ void setup()
         nmea_server_pri.onReconnect(nmea_server_pri_connect);
         nmea_server_pri.onDisconnect(nmea_server_pri_disconnect);
         Serial.print("Primary NMEA Server Status: ");
-        if (nmea_server_pri.begin(sensor_data.server_port))
+        if (nmea_server_pri.begin(sensor_data.nmea_port))
         {
             print_attribute(TEXT_ATTRIB_FG_GREEN);
             Serial.println("running.");
             print_attribute(TEXT_ATTRIB_NORMAL);
-            Serial.print("NMEA Server Port: ");
-            Serial.println(sensor_data.server_port);
+            Serial.printf("NMEA Server Port: %d\r\n", sensor_data.nmea_port);
         }
         else
         {
@@ -568,13 +665,13 @@ void setup()
         nmea_server_sec.onReconnect(nmea_server_sec_connect);
         nmea_server_sec.onDisconnect(nmea_server_sec_disconnect);
         Serial.print("Secondary NMEA Server Status: ");
-        if (nmea_server_sec.begin(sensor_data.server_port + 1))
+        if (nmea_server_sec.begin(sensor_data.nmea_port + 1))
         {
             print_attribute(TEXT_ATTRIB_FG_GREEN);
             Serial.println("running.");
             print_attribute(TEXT_ATTRIB_NORMAL);
-            Serial.print("NMEA Server Port: ");
-            Serial.println(sensor_data.server_port + 1);
+            Serial.printf("NMEA Server Port: %d\r\n",
+                          sensor_data.nmea_port + 1);
         }
         else
         {
@@ -600,15 +697,19 @@ void setup()
         print_attribute(TEXT_ATTRIB_NORMAL);
 
         // HTTP Server
-        http_server.on("/", handleRoot);
+        http_server.on("/", handler_homepage);
+        http_server.on("/gauges", handler_gauges);
         http_server.on("/push_settings", handler_push_settings);
         http_server.on("/push_wind_settings", handler_push_wind_settings);
+        http_server.on("/push_signalk_settings", handler_push_signalk_settings);
         http_server.on("/pull_settings", handler_pull_settings);
         http_server.on("/pull_wind_settings", handler_pull_wind_settings);
+        http_server.on("/pull_signalk_settings", handler_pull_signalk_settings);
+        http_server.on("/pull_wind_data", handler_pull_wind_data);
         http_server.onNotFound(handler_page_not_found);
         http_server.begin();
     }
-    else    
+    else
         Serial.println("Can't connect to WiFi Network");
 
     if (sensor_data.status.serial_logger == 1)
@@ -616,7 +717,49 @@ void setup()
 
     pinMode(ACTIVITY_LED, OUTPUT);
     digitalWrite(ACTIVITY_LED, HIGH);
-    
+
+    if (sensor_data.status.enable_ota == 1)
+    {
+      ArduinoOTA.onStart([]() {
+        String type;
+        if (ArduinoOTA.getCommand() == U_FLASH)
+            type = "sketch";
+        else
+            type = "filesystem";
+        Serial.println("Start updating " + type);
+      });
+
+      ArduinoOTA.onEnd([]()
+      {
+          Serial.println("\nEnd");
+      });
+
+      ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
+      {
+          Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+      });
+
+      ArduinoOTA.onError([](ota_error_t error)
+      {
+          Serial.printf("Error[%u]: ", error);
+          if (error == OTA_AUTH_ERROR)
+            Serial.println("Auth Failed");
+          else if (error == OTA_BEGIN_ERROR)
+            Serial.println("Begin Failed");
+          else if (error == OTA_CONNECT_ERROR)
+            Serial.println("Connect Failed");
+          else if (error == OTA_RECEIVE_ERROR)
+            Serial.println("Receive Failed");
+          else if (error == OTA_END_ERROR)
+            Serial.println("End Failed");
+      });
+      char p[128];
+      sprintf(p, "%s_ota", sensor_data.hostname);
+      ArduinoOTA.setHostname(p);
+      ArduinoOTA.begin();
+      Serial.println("OTA started");
+    }
+
     ms_timer = 0;
     reset_wind_data();
 }
@@ -630,13 +773,16 @@ void loop()
 
     if (millis() > ms_timer)
         digitalWrite(16, HIGH);
-        
+
+    if (sensor_data.status.enable_ota == 1)
+        ArduinoOTA.handle();
+
     nmea_server_pri.loop();
     nmea_server_sec.loop();
     if (sensor_data.status.telnet_logger == 1)
         telnet_logger.loop();
     http_server.handleClient();
-    
+
     switch (current_state)
     {
     case SM_STATE_SEEK_CMD:
@@ -659,7 +805,7 @@ void loop()
                 }
                 table_item += 1;
             }
-            while (seatalk_commands[table_item].cmd != 
+            while (seatalk_commands[table_item].cmd !=
                                                 SEATALK_UNSUPPORTED);
             if (seatalk_commands[table_item].cmd == SEATALK_UNSUPPORTED)
                 current_state = SM_STATE_PRETTYPRINT;
@@ -707,7 +853,7 @@ void loop()
                 break;
             }
             if ((current_state == SM_STATE_PAYLOAD) &&
-                            (packet_bytes_received == 
+                            (packet_bytes_received ==
                                 seatalk_commands[table_item].bytes))
                 current_state = SM_STATE_FORMAT;
         }
@@ -723,7 +869,7 @@ void loop()
                 apparent_wind_angle = 0.5 *
                        ma_wind_angle((cmd_payload[2] << 8) +
                                          cmd_payload[3]);
-            else                                    
+            else
                 apparent_wind_angle = 0.5 * ((cmd_payload[2] << 8) +
                                                  cmd_payload[3]);
             current_state = SM_STATE_SEND;
@@ -737,7 +883,7 @@ void loop()
                        ma_wind_speed((cmd_payload[2] & 0x7F) * 10 +
                                      (cmd_payload[3] & 0x0F));
             else
-                apparent_wind_speed = 1.0 * (cmd_payload[2] & 0x7F) + 
+                apparent_wind_speed = 1.0 * (cmd_payload[2] & 0x7F) +
                                 0.1 * (cmd_payload[3] & 0x0F);
             if ((cmd_payload[2] & 0x80) != 0)
                 // Value for speed is in m/s. We'll convert to knots.
@@ -756,24 +902,18 @@ void loop()
         switch (seatalk_commands[table_item].cmd)
         {
         case SEATALK_APPARENT_WIND_SPEED:
+            if ((nmea_server_pri_connected == true) ||
+                (nmea_server_sec_connected == true))
+                send_nmea_data(apparent_wind_angle, apparent_wind_speed);
+            if (sensor_data.status.signalk_udp_enable == true)
+                send_sk_data(sk_key_wind_speed, apparent_wind_speed);
+            break;
         case SEATALK_APPARENT_WIND_ANGLE:
             if ((nmea_server_pri_connected == true) ||
                 (nmea_server_sec_connected == true))
-            {
-                // Speed is always in knots.
-                sprintf(nmea_message,
-                        "$%sMWV,%3.1f,R,%2.1f,N,A*",
-                        sensor_data.nmea_talker,
-                        apparent_wind_angle,
-                        apparent_wind_speed);
-                sprintf(nmea_message + strlen(nmea_message),
-                        "%02X\r\n",
-                        nmea_compute_checksum(nmea_message));
-            if (nmea_server_pri_connected == true)
-                nmea_server_pri.print(nmea_message);
-            if (nmea_server_sec_connected == true)
-                nmea_server_sec.print(nmea_message);
-            }
+                send_nmea_data(apparent_wind_angle, apparent_wind_speed);
+            if (sensor_data.status.signalk_udp_enable == true)
+                send_sk_data(sk_key_wind_angle, apparent_wind_angle);
             break;
         default:
             break;
@@ -788,7 +928,7 @@ void loop()
     case SM_STATE_PRETTYPRINT:
         if ((sensor_data.status.serial_logger == 1) ||
                 (sensor_data.status.telnet_logger == 1))
-        {        
+        {
             switch (seatalk_commands[table_item].cmd)
             {
             case SEATALK_APPARENT_WIND_ANGLE:
@@ -822,7 +962,7 @@ void loop()
 
         sendout_strlogger();
         current_state = SM_STATE_SEEK_CMD;
-        break;    
+        break;
     default:
         break;
     }

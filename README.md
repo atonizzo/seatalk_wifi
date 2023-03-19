@@ -1,4 +1,8 @@
+
 # <p align=center>SEATALK_WIFI</p>
+![GitHub](https://img.shields.io/github/license/atonizzo/seatalk_wifi)
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/atonizzo/seatalk_wifi)
+![GitHub repo file count](https://img.shields.io/github/directory-file-count/atonizzo/seatalk_wifi)
 
 ---
 ### Table of contents
@@ -11,12 +15,15 @@
         2. [Back Side](#back_side)
 3. [Software](#software)
     1. [Configuration via Web Page](#web_page)
-        1. [Configuration for Wind Instrument](#wind_instrument)
+        1. [Programming Over the Air](#ota_programming)
+        2. [Configuration for Wind Instrument](#wind_instrument)
     2. [Serial Logger](#serial_logger)
     3. [Telnet Logger](#telnet_logger)
     4. [NMEA Server](#nmea_server)
         1. [NMEA Talker](#nmea_talker)
     5. [Software Debug Port](#debug_port)
+    6. [Integration with SignalK](#signalk)
+    7. [Wind Gauges](#wind_gauges)
 4. [Further Development](#further_development)
 5. [Holder for ST40 devices](#st40_holder)
 5. [Contact](#contact)
@@ -142,8 +149,11 @@ board and the pads left unconnected.
 ### <a name="back_side"></a> Back Side
 ![PCB Back Side](pictures/seatalk_wifi_back.png)
 
-The two switches on the left side are only used to program the board and are
-typically removed before the board is installed on the boat.
+The two switches on the left side of the image are only used to program the
+board when using the serial port. Once the initial firmware image is programmed
+the OTA facility (see <a href="### Programming Over the Air">Programming Over the Air</a>)
+can then be used to reimage the flash memory thus not requiring neither the
+serial port nor the toggling of the switches.
 
 In order to program the board the RST switch (the top one in the picture)
 should be pulsed **while the BOOT switch is kept pressed**. At this point
@@ -170,16 +180,28 @@ achieved. The built in defaults are:
 - The default primary NMEA port is 3030
 - The default NMEA talker is "LR"
 - Activity LED enabled
+- OTA programming enabled
 
 An example of the web page is shown in the following picture.
 
-![Configuration Web Page](pictures/webpage.png)
+![Configuration Web Page](pictures/homepage.png)
 
 The default hostname for the instrument is "wind" and can be changed in the
 software before programming (see [sw/seatalk_wifi.h](sw/seatalk_wifi.h))
 or at a later point via the configuration web page.
 
-The web page also lists the SeaTalk sentences that are supported by the bridge.
+The bottom of the web page also lists the SeaTalk sentences that are supported
+by the firmware programmed on the brige.
+
+### <a name="ota_programming"></a> Programming Over the Air
+In order to upgrade the firmware it is convenient to use the "Over the Air"
+(OTA) facility of the ESP8266. Once enabled by using the checkbox in the web
+page and once the hardware has been reset, a new hostname is available, which
+is the device hostname with the "_ota" string appended. For example, if the
+device hostname is "wind", the OTA programmer will be available at the hostname
+"wind_ota". Now the Arduino IDE or the appropriate Python script can be used
+to flash a new image without the need to connect a USB to serial port converter.
+Once the new firmware has been written the OTA programming can safely be disabled.
 
 ### <a name="wind_instrument"></a> Configuration for Wind Instrument
 In gusty wind conditions the wind angle -and to a lesser extent the speed- returned
@@ -242,6 +264,39 @@ be configured with the same setting as SeaTalk (8 bit, Even parity, 1 Stop bit).
 The information output shows the content of the configuration EEPROM as well
 as the output from the connection to a WiFi network.
 
+## <a name="signalk"></a> Integration with SignalK
+Wind speed and direction can be optionally sent to SignalK via a UDP connection.
+In the case of the wind instrument the following keys, in the form of serialized
+JSON objects, are forwarded to SignalK:
+
+`environment/wind/angleApparent`
+
+`environment/wind/speedApparent`
+
+The source for these keys is set by the firmware to be `Raymarine ST40 Wind`.
+
+To read these keys SignalK must be set to receive a UDP connection from the
+seatalk_wifi device. The IP address and port of the SignalK server can be
+programmed into the seatlk_wifi device via the
+<a href="## Configuration via Web Page">configuration web page</a>.
+
+## <a name="wind_gauges"></a> Wind Gauges
+In the case in which a connection to a display unit (e.g. OpenCPN or or
+SignalK) is not available wind information can be read by means of a pair of
+gauges available at the URL http://wind/gauges. This is useful in the case
+where a cellphone or a pad is the only device available.
+
+The gauges are updated every second with measured wind speed and direction. The
+data is also accumulated and a temperature encoded histogram is created around
+the edge of both dials. In this way it is possible to evaluate prevalent
+wind condition for the past few minutes.
+
+![Wind Gauges](pictures/gauges.png)
+
+The Javascript implementation for the gauges was written by Mykhailo Stadnyk
+and it is under a MIT license. The GitHub repository can be found at
+[Canvas Gauges](https://github.com/Mikhus/canvas-gauges).
+
 # <a name="further_development"></a> Further Developmnent
 The project can be improved in a number of ways.
 
@@ -287,7 +342,12 @@ coming out from the top.
 Original FreeCAD file and STEP files are provided in the ```holder```
 directory.
 
-![ST40 Holder](pictures/ST40_holder.png)
+![ST40 Holder Front](pictures/ST40_holder_front.png)
+
+The mounting holes for the holder are 25 mm apart and are spaced to optionally
+connect to a DIN rail clip using 3 mm flathead countersunk screws.
+
+![ST40 Holder Back](pictures/ST40_holder_back.png)
 
 # <a name="contact"></a> Contact
 <atonizzo@gmail.com>

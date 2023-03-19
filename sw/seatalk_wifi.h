@@ -1,9 +1,9 @@
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -33,7 +33,7 @@ typedef enum
     //  the stream of payload bytes that was received
     //  is correct.
     SM_STATE_SANITY_CHECK       = 2,
-    
+
     // The SM_STATE_FORMAT state extract any relevant
     //  information from the payload bytes.
     SM_STATE_FORMAT             = 3,
@@ -60,7 +60,7 @@ struct __cmd
     seatalk_cmd_t cmd;  // Command byte.
     uint8_t bytes;      // Number of bytes other than the
                         //  command byte.
-    char *cmd_name;     // Command name for pretty print.
+    const char *cmd_name;     // Command name for pretty print.
 };
 
 typedef enum
@@ -101,7 +101,9 @@ struct __status
     volatile uint32_t colorize_prettyprint  : 1;
     volatile uint32_t activity_led          : 1;
     volatile uint32_t wifi_power            : 8;
-             uint32_t                       : 17;
+    volatile uint32_t enable_ota            : 1;
+    volatile uint32_t signalk_udp_enable    : 1;
+             uint32_t                       : 15;
 };
 typedef struct __status status_t;
 
@@ -118,16 +120,19 @@ typedef struct __wind_data wind_data_t;
 struct __sensor_data
 {
     volatile status_t status;
-    volatile uint32_t server_port;
+    volatile uint32_t nmea_port;
     volatile uint8_t hostname[32];
     volatile uint8_t nmea_talker[3];
     wind_data_t wind_data;
-    volatile uint8_t reserved[9];
+    volatile uint8_t signalk_udp_ip[4];
+    volatile uint32_t signalk_udp_port;
+    volatile uint8_t reserved[1];
     volatile uint32_t magic_number;
 };
 typedef struct __sensor_data sensor_data_t;
 extern sensor_data_t sensor_data, sensor_data_mem;
 
+#define FIRMWARE_VERSION            "2.0"
 #define EEPROM_SIZE                 sizeof(sensor_data_t)
 #define MAGIC_NUMBER                0xABBACAFE
 #define DEFAULT_HOSTNAME            "wind"
@@ -141,6 +146,8 @@ extern unsigned int wind_speed_history[WIND_SPEED_FILTER_TAPS];
 extern unsigned int last_wind_speed;
 
 #define ACTIVITY_LED                12
+
+#define DEFAULT_SIGNALK_SOURCE      "Raymarine ST40 Wind"
 
 extern const int baudrates[];
 void print_attribute(text_attribute_t);

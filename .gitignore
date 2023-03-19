@@ -12,9 +12,16 @@ _autosave-*
 *.tmp
 *-save.pro
 *-save.kicad_pcb
-fp-info-cache
-hw/seatalk_wifi-backups/
+hw/sym-lib-table
+hw/fp-lib-table
+hw/fp-info-cache
+hw/seatalk_wifi-backups/**
 wifi_credentials.h
+
+# Eclipse files
+sw/.cproject
+sw/.project
+sw/.settings/
 
 # Netlist files (exported from Eeschema)
 *.net
