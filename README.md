@@ -49,8 +49,7 @@ is a 12 Volt connection to the battery
 # <a name="hardware"></a> Hardware
 The hardware is a simple board with pads designed to connect to to a 12V
 source on one side (typically a switched and fused boat battery) and to
-a Seatalk connector on the other
-(see <a href="### PCB Layout">PCB layout pictures</a>). The
+a Seatalk connector on the other (see [PCB layout pictures](#pcb_layout))
 board supplies 12V to power the target instrument so that the only
 connection needed for the system to work is a single 12V feed from the boat
 electrical panel.
@@ -123,7 +122,7 @@ On the top side of the board the pads, from left to right, are:
 - Serial Logger (unmarked on the PCB) This pin is connected to the TX pin
 of serial port 2 of the ESP12 and -if enabled by the user- emits a
 pretty print of all the commands handled by the hardware
-(see <a href="### Serial Logger">Serial Logger</a>).
+(see [Serial Logger](#serial_logger))
 
 - Programming cable RX line (marked with R in the layout). This is connected
 to the RX pin of serial port 1 of the ESP12 and is primarily used to program
@@ -151,7 +150,7 @@ board and the pads left unconnected.
 
 The two switches on the left side of the image are only used to program the
 board when using the serial port. Once the initial firmware image is programmed
-the OTA facility (see <a href="### Programming Over the Air">Programming Over the Air</a>)
+the OTA facility (see [Programming Over the Air](#ota_programming))
 can then be used to reimage the flash memory thus not requiring neither the
 serial port nor the toggling of the switches.
 
@@ -215,7 +214,7 @@ instrument.
 ## <a name="serial_logger"></a> Serial Logger
 A timestamped pretty print of all the commands handled by the bridge is
 printed out to the serial logger, connected to Serial1 (for wiring information
-see <a href="#### Front Side">Front Side</a>). This is not the actual NMEA
+see [Front Side](#front_side)). This is not the actual NMEA
 data but rather descriptive information of each Seatalk command in the
 order that it was processed.
 
@@ -278,7 +277,7 @@ The source for these keys is set by the firmware to be `Raymarine ST40 Wind`.
 To read these keys SignalK must be set to receive a UDP connection from the
 seatalk_wifi device. The IP address and port of the SignalK server can be
 programmed into the seatlk_wifi device via the
-<a href="## Configuration via Web Page">configuration web page</a>.
+[Configuration Web Page](#web_page).
 
 ## <a name="wind_gauges"></a> Wind Gauges
 In the case in which a connection to a display unit (e.g. OpenCPN or or
